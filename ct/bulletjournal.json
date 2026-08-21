@@ -15,11 +15,11 @@
     "install_methods": [
       {
         "type": "default",
-        "script": "/install-bulletjournal.sh",
+        "script": "/install.sh",
         "resources": {
           "cpu": 2,
           "ram": 2048,
-          "disk": 5
+          "disk": 8
         },
         "arguments": []
       }

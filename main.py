@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import Boolean, Date, DateTime, Float, Integer, String, Text, create_engine, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
-BASE_DIR = Path(__file__).resolve().parents[2]
+BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = Path(os.getenv("BULLETJOURNAL_DATA_DIR", BASE_DIR / "data"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_URL = os.getenv("BULLETJOURNAL_DB_URL", f"sqlite:///{DATA_DIR / 'bulletjournal.db'}")
