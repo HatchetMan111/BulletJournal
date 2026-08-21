@@ -4,6 +4,35 @@ Eine selbstgehostete, datenschutzfreundliche Bullet-Journal-Anwendung mit lokale
 
 ---
 
+## Installation (Proxmox / Debian / Ubuntu)
+
+**One-Liner – einfach kopieren und ausführen:**
+
+```bash
+bash -c "$(wget -qLO - https://github.com/HatchetMan111/BulletJournal/raw/main/install.sh)"
+```
+
+Das installiert automatisch:
+- Python 3 + Abhängigkeiten
+- BulletJournal Backend (FastAPI)
+- Frontend (React)
+- Systemd-Service (`bulletjournal.service`)
+- Datenbank unter `/opt/bulletjournal/data/`
+
+**Nach der Installation:**
+- URL: `http://<DEINE-IP>:8000`
+- Service: `systemctl status bulletjournal`
+- Logs: `journalctl -u bulletjournal -f`
+- Daten-Export: `http://<DEINE-IP>:8000/api/export`
+
+**Optional – Ollama für KI-Briefing:**
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull llama3.2:3b
+```
+
+---
+
 ## Features
 
 ### Tägliches Journaling

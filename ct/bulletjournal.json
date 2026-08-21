@@ -1,0 +1,28 @@
+{
+  "BulletJournal": {
+    "name": "BulletJournal Life-OS",
+    "slug": "bulletjournal",
+    "primary_key": "ID",
+    "maintainer": "HatchetMan111",
+    "date": "21.08.2026",
+    "type": "update",
+    "updateable": true,
+    "privileged": false,
+    "interface_port": "8000",
+    "documentation": "https://github.com/HatchetMan111/BulletJournal",
+    "logo": "https://raw.githubusercontent.com/HatchetMan111/BulletJournal/main/logo.png",
+    "description": "BulletJournal Life-OS – Dein persönliches Journaling-System mit lokaler KI-Unterstützung",
+    "install_methods": [
+      {
+        "type": "default",
+        "script": "/install-bulletjournal.sh",
+        "resources": {
+          "cpu": 2,
+          "ram": 2048,
+          "disk": 5
+        },
+        "arguments": []
+      }
+    ]
+  }
+}
