@@ -16,14 +16,11 @@ header_info() {
   clear
   cat <<EOF
 
-  ${GN}  ____  _       _        ___                  _   _           _       ${CL}
-  ${GN} | __ )(_)_ __ (_)      | __ )  ___  __ _  __| | | | ___  ___| |_ ___${CL}
-  ${GN} |  _ \| | '_ \| _____  |  _ \ / _ \\/ _\` |/ _\` | | |/ _ \/ __| __/ __|${CL}
-  ${GN} | |_) | | | | | |____| | |_) |  __/ (_| | (_| | | |  __/\__ \ |_\__ \${CL}
-  ${GN} |____/|_|_| |_|_|      |____/ \___|\__,_|\__,_| |_|\___||___/\__|___/${CL}
-
-  ${YW}BulletJournal Life-OS – Dein persönliches Journaling-System${CL}
-  ${YW}https://github.com/HatchetMan111/BulletJournal${CL}
+  ${GN}==============================================${CL}
+  ${GN}     BULLET JOURNAL - LIFE OS${CL}
+  ${GN}==============================================${CL}
+  ${YW}   Dein persoenliches Journaling-System${CL}
+  ${YW}   https://github.com/HatchetMan111/BulletJournal${CL}
 
 EOF
 }
