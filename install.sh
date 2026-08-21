@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# BulletJournal Life-OS – Proxmox VE Helper Script
-# License: MIT
+# Copyright (c) 2024 BulletJournal
+# License: MIT | https://github.com/HatchetMan111/BulletJournal
 
 YW=$(echo '\033[33m')
 GN=$(echo '\033[1;32m')
@@ -15,16 +15,16 @@ trap 'echo -e "\n${CR} Install abgebrochen.${CL}"; exit 1' ERR
 header_info() {
   clear
   cat <<EOF
-${GN}
-  ██████╗ ██╗   ██╗██╗   ██╗ ██████╗ ███████╗██╗      ██████╗ ██╗    ██╗
-  ██╔══██╗██║   ██║██║   ██║██╔════╝ ██╔════╝██║     ██╔═══██╗██║    ██║
-  ██████╔╝██║   ██║██║   ██║██║  ███╗█████╗  ██║     ██║   ██║██║ █╗ ██║
-  ██╔══██╗██║   ██║██║   ██║██║   ██║██╔══╝  ██║     ██║   ██║██║███╗██║
-  ██║  ██║╚██████╔╝╚██████╔╝╚██████╔╝██║     ███████╗╚██████╔╝╚███╔███╔╝
-  ╚═╝  ╚═╝ ╚═════╝  ╚═════╝  ╚═════╝ ╚═╝     ╚══════╝ ╚═════╝  ╚══╝╚══╝
-${CL}
-  ${GN}BulletJournal Life-OS – Dein persönliches Journaling-System${CL}
+
+  ${GN}  ____  _       _        ___                  _   _           _       ${CL}
+  ${GN} | __ )(_)_ __ (_)      | __ )  ___  __ _  __| | | | ___  ___| |_ ___${CL}
+  ${GN} |  _ \| | '_ \| _____  |  _ \ / _ \\/ _\` |/ _\` | | |/ _ \/ __| __/ __|${CL}
+  ${GN} | |_) | | | | | |____| | |_) |  __/ (_| | (_| | | |  __/\__ \ |_\__ \${CL}
+  ${GN} |____/|_|_| |_|_|      |____/ \___|\__,_|\__,_| |_|\___||___/\__|___/${CL}
+
+  ${YW}BulletJournal Life-OS – Dein persönliches Journaling-System${CL}
   ${YW}https://github.com/HatchetMan111/BulletJournal${CL}
+
 EOF
 }
 
@@ -34,7 +34,7 @@ msg_error(){ echo -e "  ${CR} ${RD}${1}${CL}"; }
 
 header_info
 
-echo -e "\n  ${YW}Dies installiert BulletJournal auf deinem Proxmox-Host.${CL}\n"
+echo -e "  ${YW}Dies installiert BulletJournal auf deinem System.${CL}\n"
 echo -e "  Installationsverzeichnis: ${GN}/opt/bulletjournal${CL}"
 echo -e "  Port:                     ${GN}8000${CL}"
 echo -e "  Service:                  ${GN}bulletjournal.service${CL}\n"
@@ -72,7 +72,7 @@ pip3 install -q fastapi uvicorn sqlalchemy httpx pydantic 2>/dev/null || \
   python3 -m pip install -q fastapi uvicorn sqlalchemy httpx pydantic 2>/dev/null
 msg_ok "Python-Pakete installiert"
 
-# ── Frontend bauen ──────────────────────────────────────────────────
+# ── Frontend ────────────────────────────────────────────────────────
 msg_info "Frontend wird vorbereitet"
 cat <<'HTMLEOF' > /opt/bulletjournal/frontend/dist/index.html
 <!DOCTYPE html>
@@ -93,11 +93,9 @@ cat <<'HTMLEOF' > /opt/bulletjournal/frontend/dist/index.html
 </html>
 HTMLEOF
 
-# Copy frontend assets from repo
 cp /opt/bulletjournal/main.jsx /opt/bulletjournal/frontend/dist/main.jsx 2>/dev/null || true
 cp /opt/bulletjournal/styles.css /opt/bulletjournal/frontend/dist/styles.css 2>/dev/null || true
 
-# Create manifest for PWA
 cat <<'MANEOF' > /opt/bulletjournal/frontend/dist/manifest.json
 {
   "name": "BulletJournal Life-OS",
@@ -105,8 +103,7 @@ cat <<'MANEOF' > /opt/bulletjournal/frontend/dist/manifest.json
   "start_url": "/",
   "display": "standalone",
   "background_color": "#111827",
-  "theme_color": "#111827",
-  "icons": [{"src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📓</text></svg>", "sizes": "any", "type": "image/svg+xml"}]
+  "theme_color": "#111827"
 }
 MANEOF
 msg_ok "Frontend vorbereitet"
