@@ -1,0 +1,8 @@
+{
+  "name": "BulletJournal Life-OS",
+  "short_name": "BulletJournal",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#111827"
+}

@@ -13,9 +13,8 @@ bash -c "$(wget -qLO - https://github.com/HatchetMan111/BulletJournal/raw/main/i
 ```
 
 Das installiert automatisch:
-- Python 3 + Abhängigkeiten
-- BulletJournal Backend (FastAPI)
-- Frontend (React)
+- Python 3 + FastAPI-Backend in einem venv
+- Node.js + Frontend-Build (Vite/React -> statische Dateien)
 - Systemd-Service (`bulletjournal.service`)
 - Datenbank unter `/opt/bulletjournal/data/`
 
@@ -95,7 +94,20 @@ Die API ist dann unter `http://localhost:8000` erreichbar.
 
 ### 2. Frontend
 
-Das Frontend (`main.jsx`) kann direkt im Browser oder über einen Dev-Server (z. B. Vite) betrieben werden. Im Produktivmodus sucht das Backend nach einer `frontend/dist/` – dort können die gebauten Assets abgelegt werden.
+Das Frontend liegt unter `frontend/` (Vite + React). Entwicklung:
+
+```bash
+cd frontend
+npm install
+npm run dev        # Dev-Server auf http://localhost:5173 (Proxy /api -> :8000)
+```
+
+Produktions-Build:
+
+```bash
+cd frontend
+npm run build      # erstellt frontend/dist/ – wird vom Backend ausgeliefert
+```
 
 ### 3. Ollama (optional)
 

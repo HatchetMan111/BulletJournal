@@ -165,43 +165,18 @@ python3 -m venv /opt/bulletjournal/venv
 BJ_SETUP
 msg_ok "Python-Pakete installiert"
 
-# ── Frontend-Dateien ablegen ────────────────────────────────────────
-msg_info "Richte Frontend ein"
+# ── Frontend bauen (Vite/React -> statische Dateien) ────────────────
+msg_info "Installiere Node.js und baue Frontend"
 pct exec "$CTID" -- bash <<'BJ_SETUP'
-cp /opt/bulletjournal/main.jsx /opt/bulletjournal/frontend/dist/main.jsx
-cp /opt/bulletjournal/styles.css /opt/bulletjournal/frontend/dist/styles.css
-
-cat <<'HTMLEOF' > /opt/bulletjournal/frontend/dist/index.html
-<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BulletJournal Life-OS</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📓</text></svg>">
-  <meta name="theme-color" content="#111827">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-</head>
-<body>
-  <div id="root"></div>
-  <script type="module" src="/main.jsx"></script>
-</body>
-</html>
-HTMLEOF
-
-cat <<'MANEOF' > /opt/bulletjournal/frontend/dist/manifest.json
-{
-  "name": "BulletJournal Life-OS",
-  "short_name": "BulletJournal",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#111827",
-  "theme_color": "#111827"
-}
-MANEOF
+export DEBIAN_FRONTEND=noninteractive
+apt-get install -y -qq nodejs npm >/dev/null
+node --version
+cd /opt/bulletjournal/frontend
+npm ci --no-audit --no-fund >/dev/null 2>&1 || npm install --no-audit --no-fund
+npm run build
+test -f /opt/bulletjournal/frontend/dist/index.html
 BJ_SETUP
-msg_ok "Frontend eingerichtet"
+msg_ok "Frontend gebaut"
 
 # ── systemd-Dienst einrichten ───────────────────────────────────────
 msg_info "Erstelle systemd-Dienst (bulletjournal.service)"
@@ -246,6 +221,8 @@ if [[ -z "$SVC_OK" ]]; then
 fi
 pct exec "$CTID" -- curl -fsS http://localhost:8000/api/health >/dev/null \
   || die "API antwortet nicht auf http://localhost:8000/api/health"
+pct exec "$CTID" -- bash -c 'curl -fsS http://localhost:8000/ | grep -q "<script"' \
+  || die "Frontend wird nicht korrekt ausgeliefert (index.html ohne Build-Assets)."
 msg_ok "Installation verifiziert"
 
 # ── IP ermitteln ────────────────────────────────────────────────────
