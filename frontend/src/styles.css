@@ -193,3 +193,31 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   .primary,.secondary,.ghost{padding:10px 12px}
   .toast{right:12px;bottom:calc(78px + env(safe-area-inset-bottom));left:12px;text-align:center}
 }
+
+/* === Uebersicht & Modal kompakt auf Mobil === */
+@media(max-width:900px){
+  /* .modal-grid (3 Spalten) ueberschreibt sonst die Mobile-Regel */
+  .quick-stats.modal-grid,.modal-grid{grid-template-columns:1fr 1fr}
+  /* Sektionen auf der Uebersichtsseite: Trennlinien + Abstand */
+  .single .modal-section{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #f0f1f3}
+  .single .modal-section:last-of-type{border-bottom:0;margin-bottom:0}
+  .single .advanced-toggle{margin-bottom:12px}
+  body{overflow-x:hidden}
+}
+@media(max-width:640px){
+  .card{padding:12px;border-radius:13px}
+  .card-head{margin-bottom:10px}
+  .card-head h3{font-size:15px}
+  .modal-section h4{margin:0 0 8px;font-size:10.5px;letter-spacing:.08em}
+  .quick-stats,.modal-grid,.text-grid,.checks,.top3{gap:8px}
+  .field{gap:4px;font-size:10.5px}
+  .field input,.field textarea{padding:8px 9px;border-radius:9px}
+  .field textarea{min-height:52px}
+  .mood{width:36px;height:36px;font-size:17px;border-radius:10px}
+  .mood-row{gap:6px;margin:10px 0 12px}
+  .toggle{padding:9px 10px;font-size:13px;border-radius:10px;gap:8px}
+  .toggle span{font-size:12px}
+  .advanced-toggle{padding:9px 12px;font-size:12px}
+  .overview-save{margin-top:10px}
+  .overview-save .primary{width:100%}
+}
