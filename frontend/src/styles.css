@@ -149,3 +149,4 @@ button.mini{border:1px solid #dfe3e8;background:#fbfbfa;border-radius:8px;paddin
 .recap-highlight{display:flex;gap:10px;align-items:flex-start;border-left:3px solid #f59e0b;background:#fdf9ee;padding:11px 14px;border-radius:0 12px 12px 0;margin-top:16px}
 .recap-highlight p{margin:0;font-size:13.5px;color:#5b4a1f}
 @media(max-width:640px){.recap-body.v2{grid-template-columns:1fr;justify-items:center}.recap-body.v2 .recap-bars{width:100%}}
+.ai-result.okline{border:1px solid #cdddc9;background:#eef5ec;color:#203b20}

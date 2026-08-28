@@ -874,13 +874,34 @@ function Settings() {
   const [result, setResult] = useState('');
   const [models, setModels] = useState(undefined); // undefined = noch nicht geladen, [] = Fehler/leer
   const [busy, setBusy] = useState(false);
+  const [test, setTest] = useState('');
   useEffect(() => { api('/ollama/settings').then(setS); loadModels(); }, []);
   const loadModels = () => {
     setBusy(true);
     api('/ollama/models').then(d => setModels(d.models)).catch(() => setModels([])).finally(() => setBusy(false));
   };
   const save = async () => { await api('/ollama/settings', {method: 'PUT', body: JSON.stringify(s)}); setResult('Einstellungen gespeichert'); loadModels(); };
-  const briefing = async () => { try { const r = await api('/ollama/briefing/' + today, {method: 'POST'}); setResult(r.response); } catch (e) { setResult('Ollama Fehler: ' + e.message); } };
+  const testModel = async () => {
+    setTest('Teste "' + s.model + '" …');
+    try {
+      const r = await api('/ollama/check-model', {method: 'POST', body: JSON.stringify({model: s.model})});
+      if (r.ok) setTest('✓ Modell "' + r.model + '" antwortet.');
+      else {
+        const hint = (r.status === 404 || r.status === 410) ? ' → Modell ist veraltet oder nicht geladen, bitte ein anderes wählen.' : '';
+        setTest('✗ Nicht nutzbar' + (r.status ? ' (HTTP ' + r.status + ')' : '') + ': ' + (r.detail || 'unbekannt') + hint);
+      }
+    } catch (e) { setTest('✗ Ollama nicht erreichbar'); }
+  };
+  const briefing = async () => {
+    try {
+      const r = await api('/ollama/briefing/' + today, {method: 'POST'});
+      setResult(r.response);
+    } catch (e) {
+      let msg = e.message;
+      try { msg = JSON.parse(e.message).detail || msg; } catch (_) {}
+      setResult('Ollama Fehler: ' + msg);
+    }
+  };
   return <div className="single">
     <Card><div className="card-head"><h3>Lokale KI · Ollama</h3><Sparkles/></div>
       <Toggle label="Ollama aktivieren" value={s.enabled} onChange={v => setS({...s, enabled: v})}/>
@@ -900,7 +921,12 @@ function Settings() {
       {models && models.length === 0 && <p className="warnline">Ollama nicht erreichbar oder keine Modelle geladen. URL prüfen, dann: <code>ollama pull llama3.2:3b</code></p>}
       {models && models.length > 0 && !models.includes(s.model) && <p className="warnline">Aktuell gewähltes Modell „{s.model}" ist auf dem Ollama-Server nicht geladen – bitte oben wählen.</p>}
       <Toggle label="Sensible Daten an KI senden" value={s.include_sensitive} onChange={v => setS({...s, include_sensitive: v})}/>
-      <div className="button-row"><button className="primary" onClick={save}>Speichern</button><button className="secondary" onClick={briefing}>Tagesbriefing erzeugen</button></div>
+      <div className="button-row">
+        <button className="primary" onClick={save}>Speichern</button>
+        <button className="secondary" onClick={testModel}>Modell testen</button>
+        <button className="secondary" onClick={briefing}>Tagesbriefing erzeugen</button>
+      </div>
+      {test && <pre className={'ai-result' + (test.startsWith('✓') ? ' okline' : '')}>{test}</pre>}
       {result && <pre className="ai-result">{result}</pre>}
     </Card>
     <Card><div className="card-head"><h3>Daten</h3><Wallet/></div><p className="muted">Deine Daten bleiben lokal. Exportiere regelmäßig ein Backup.</p><a className="primary linkbtn" href={API + '/export'}>JSON Export</a></Card>

@@ -12,7 +12,7 @@ import httpx
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import Boolean, Date, DateTime, Float, Integer, String, Text, create_engine, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
@@ -271,6 +271,25 @@ AREAS = [
     ("environment", "Umgebung & Lebensqualität"), ("meaning", "Sinn, Werte & Vision"),
 ]
 
+def _parse_number(v: Any) -> float | None:
+    """Tolerant parsen: '' -> None, '7,5' -> 7.5, Muell -> None."""
+    if v is None:
+        return None
+    if isinstance(v, str):
+        v = v.strip().replace(",", ".")
+        if v == "":
+            return None
+        try:
+            v = float(v)
+        except ValueError:
+            return None
+    return float(v)
+
+
+_INT_BOUNDS = {"mood": (1, 6), "productivity": (1, 10), "day_rating": (1, 10), "stress": (1, 10), "energy": (1, 10)}
+_FLOAT_FIELDS = ("sleep_hours", "water_liters", "protein_grams", "money_saved", "money_earned", "expenses")
+_FLOAT_BOUNDS = {"sleep_hours": (0, 24), "water_liters": (0, 20)}
+
 class DailyIn(BaseModel):
     day: date
     mood: int | None = Field(default=None, ge=1, le=6)
@@ -311,6 +330,27 @@ class DailyIn(BaseModel):
     tomorrow_2_done: bool = False
     tomorrow_3_done: bool = False
 
+    @field_validator(*_INT_BOUNDS.keys(), mode="before")
+    @classmethod
+    def _lenient_int(cls, v: Any, info: Any) -> int | None:
+        v = _parse_number(v)
+        if v is None:
+            return None
+        lo, hi = _INT_BOUNDS[info.field_name]
+        return max(lo, min(hi, int(round(v))))
+
+    @field_validator(*_FLOAT_FIELDS, mode="before")
+    @classmethod
+    def _lenient_float(cls, v: Any, info: Any) -> float | None:
+        v = _parse_number(v)
+        if v is None:
+            return None
+        bounds = _FLOAT_BOUNDS.get(info.field_name)
+        if bounds:
+            lo, hi = bounds
+            v = max(lo, min(hi, v))
+        return v
+
 class GoalIn(BaseModel):
     title: str
     description: str | None = None
@@ -328,6 +368,12 @@ class GoalUpdate(BaseModel):
     progress: int | None = Field(default=None, ge=0, le=100)
     active: bool | None = None
 
+    @field_validator("progress", mode="before")
+    @classmethod
+    def _clamp_progress(cls, v: Any) -> int | None:
+        v = _parse_number(v)
+        return None if v is None else max(0, min(100, int(round(v))))
+
 class ProjectIn(BaseModel):
     title: str
     description: str | None = None
@@ -343,6 +389,12 @@ class ProjectUpdate(BaseModel):
     progress: int | None = Field(default=None, ge=0, le=100)
     next_action: str | None = None
     status: str | None = None
+
+    @field_validator("progress", mode="before")
+    @classmethod
+    def _clamp_progress(cls, v: Any) -> int | None:
+        v = _parse_number(v)
+        return None if v is None else max(0, min(100, int(round(v))))
 
 class VisionIn(BaseModel):
     horizon: str
@@ -371,6 +423,12 @@ class MatrixUpdate(BaseModel):
     note: str | None = None
     quadrant: int | None = Field(default=None, ge=1, le=4)
     done: bool | None = None
+
+    @field_validator("quadrant", mode="before")
+    @classmethod
+    def _clamp_quadrant(cls, v: Any) -> int | None:
+        v = _parse_number(v)
+        return None if v is None else max(1, min(4, int(round(v))))
 
 class OllamaSettings(BaseModel):
     enabled: bool = False
@@ -700,6 +758,27 @@ async def list_ollama_models():
     except Exception as exc:
         raise HTTPException(502, f"Ollama nicht erreichbar unter {settings['url']}: {exc}")
     return {"url": settings["url"], "models": sorted(m.get("name", "") for m in data.get("models", []) if m.get("name"))}
+
+class ModelCheckIn(BaseModel):
+    model: str | None = None
+
+@app.post("/api/ollama/check-model")
+async def check_ollama_model(payload: ModelCheckIn):
+    """Testet ein Modell mit einer Mini-Anfrage, damit veraltete/nicht
+    geladene Modelle sofort auffallen (z.B. 'was retired ...')."""
+    settings = get_ollama_settings()
+    model = (payload.model or settings["model"]).strip()
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            response = await client.post(
+                f"{settings['url']}/api/generate",
+                json={"model": model, "prompt": "Antworte nur mit: OK", "stream": False, "options": {"num_predict": 8}},
+            )
+            if response.status_code != 200:
+                return {"ok": False, "model": model, "status": response.status_code, "detail": response.text[:400]}
+            return {"ok": True, "model": model, "response": (response.json().get("response") or "")[:80]}
+    except Exception as exc:
+        return {"ok": False, "model": model, "detail": str(exc)[:400]}
 
 @app.post("/api/ollama/briefing/{day}")
 async def ollama_briefing(day: date):
