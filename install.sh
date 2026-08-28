@@ -28,15 +28,18 @@ shopt -s expand_aliases
 function header_info {
   clear
   cat <<"EOF"
-    ____        __       _ __   __ ____  __    ___
-   / __ )__  __/ /_  ___(_) /_/ _/ __ \/ /   /__ \
-  / __  / / / / __ \/ _ `/ __/ // / / / /   / _  /
- / /_/ / /_/ / /_/ /  __/ /_/ // / / / /___/ /  /
-/_____/\__,_/_.___/\___/_/\__/___/_/_____/____/
 
-           BULLET JOURNAL - LIFE OS
-     LXC Container Installer fuer Proxmox VE
+  ┌──────────────────────────────────────────────────────┐
+  │                                                      │
+  │      B U L L E T   J O U R N A L                     │
+  │      ─────────────────────────────                   │
+  │      L I F E   O S                                   │
+  │                                                      │
+  │      Proxmox VE  ·  LXC Container Installer          │
+  │                                                      │
+  └──────────────────────────────────────────────────────┘
    https://github.com/HatchetMan111/BulletJournal
+
 EOF
 }
 
@@ -89,20 +92,34 @@ if ! [[ "$CTID" =~ ^[0-9]+$ ]] || [[ "$CTID" -lt 100 ]]; then
 fi
 
 if pct status "$CTID" &>/dev/null; then
-  echo -ne "${YW}Container ${CTID} existiert bereits. Loeschen und neu erstellen? (j/n) ${CL}"
-  read -r -n 1 REPLY
-  echo
-  if [[ ! $REPLY =~ ^[Jj]$ ]]; then
-    die "Abgebrochen."
+  if [[ "$CTID" == "$DEFAULT_CTID" ]]; then
+    msg_info "Container ${CTID} ist belegt - suche naechste freie ID"
+    FOUND=""
+    for ((i = CTID + 1; i < CTID + 100; i++)); do
+      if ! pct status "$i" &>/dev/null; then
+        FOUND=$i
+        break
+      fi
+    done
+    [[ -n "$FOUND" ]] || die "Keine freie Container-ID gefunden (${CTID}..$((CTID + 99)))."
+    msg_ok "Nutze Container-ID ${FOUND}"
+    CTID=$FOUND
+  else
+    echo -ne "${YW}Container ${CTID} existiert bereits. Loeschen und neu erstellen? (j/n) ${CL}"
+    read -r -n 1 REPLY
+    echo
+    if [[ ! $REPLY =~ ^[Jj]$ ]]; then
+      die "Abgebrochen."
+    fi
+    msg_info "Stoppe Container ${CTID}"
+    pct stop "$CTID" >/dev/null 2>&1 || true
+    sleep 2
+    msg_ok "Gestoppt"
+    msg_info "Loesche Container ${CTID}"
+    pct destroy "$CTID" --purge >/dev/null 2>&1 || true
+    sleep 2
+    msg_ok "Geloescht"
   fi
-  msg_info "Stoppe Container ${CTID}"
-  pct stop "$CTID" >/dev/null 2>&1 || true
-  sleep 2
-  msg_ok "Gestoppt"
-  msg_info "Loesche Container ${CTID}"
-  pct destroy "$CTID" --purge >/dev/null 2>&1 || true
-  sleep 2
-  msg_ok "Geloescht"
 fi
 
 # ── Container erstellen ─────────────────────────────────────────────

@@ -46,18 +46,22 @@ ollama pull llama3.2:3b
 - **Morgen · Top 3**: Plane abends die 3 wichtigsten Aufgaben für morgen
 
 ### Ziele & Projekte
-- **Ziele** mit Horizon (1 Jahr / 5 Jahre / 10 Jahre) und Fortschritt
-- **Projekte** mit nächster Aktion und Status
+- **Ziele** mit Horizon (1 Jahr / 5 Jahre / 10 Jahre) und Fortschritt – direkt prozentweise steuerbar und abschließbar
+- **Projekte** mit nächster Aktion, Fortschritt und Status (geplant / in Arbeit / erledigt)
+- **Kanban-Board**: Projekte & Ziele per Drag & Drop (mobil per Pfeile) durch Spalten schieben
+- **Eisenhower-Matrix**: Aufgaben, Ziele und Projekte nach wichtig/dringend in 4 Quadranten einsortieren – inkl. Import bestehender Ziele/Projekte
 - **Vision**: 10-Jahres-, 5-Jahres- und Jahresvision als Text
 
 ### Auswertung & Trends
 - **KPI-Dashboard**: Stimmung, Schlaf, Laufen, Lesen, Schreiben im Vergleich
 - **Trend-Diagramme** nach Tag, Monat oder Jahr
+- **Trends**: echte Liniendiagramme (30/90/180/365 Tage) für jeden Kennwert – Langzeittrend auf einen Blick
 - **Zieltreue-Tracker**: Gewohnheiten über 4 Wochen visualisieren
 - **30-Tage-Baseline**: Durchschnittswerte für alle Kennzahlen
 
 ### Ollama-KI-Briefing
-- Lokale KI (z. B. `llama3.2:3b`) erstellt ein Tagesbriefing
+- Lokale KI erstellt ein Tagesbriefing
+- **Modell-Auswahl**: listet die Modelle, die tatsächlich auf deinem Ollama-Server geladen sind – kein Rätselraten mehr bei Modellnamen
 - Vergleicht dich mit deiner eigenen Basislinie
 - Formuliert **Hypothesen statt Diagnosen**
 - Sensible Daten können optional ein- oder ausgeschaltet werden
@@ -132,12 +136,16 @@ In den Einstellungen der App Ollama aktivieren und URL/Modell konfigurieren.
 | `GET` | `/api/daily?days=90` | Letzte X Tage auflisten |
 | `GET` | `/api/insights?days=30` | Statistiken & Trends |
 | `GET/POST` | `/api/goals` | Ziele verwalten |
+| `PUT` | `/api/goals/{id}` | Ziel: Fortschritt & abschließen |
 | `GET/POST` | `/api/projects` | Projekte verwalten |
+| `PUT` | `/api/projects/{id}` | Projekt: Fortschritt, Status (Kanban) |
+| `GET/POST/PUT/DELETE` | `/api/matrix` | Eisenhower-Matrix (Q1–Q4) |
 | `GET/PUT` | `/api/visions` | Visionen (10y/5y/1y) |
 | `GET/POST` | `/api/trackers` | Tracker verwalten |
 | `GET/POST` | `/api/journal` | Journal-Einträge |
 | `GET` | `/api/export` | Daten als JSON exportieren |
 | `PUT` | `/api/ollama/settings` | Ollama-Einstellungen |
+| `GET` | `/api/ollama/models` | Geladene Ollama-Modelle abfragen |
 | `POST` | `/api/ollama/briefing/{day}` | KI-Tagesbriefing |
 
 ---

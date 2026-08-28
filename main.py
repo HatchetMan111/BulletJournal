@@ -114,6 +114,18 @@ class JournalEntry(Base):
     content: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+class MatrixItem(Base):
+    """Eisenhower-Matrix: Ziele, Projekte und To-dos nach
+    wichtig/dringend in 4 Quadranten einsortieren (1-4)."""
+    __tablename__ = "matrix_items"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(255))
+    note: Mapped[str | None] = mapped_column(Text)
+    quadrant: Mapped[int] = mapped_column(Integer, default=2)
+    kind: Mapped[str] = mapped_column(String(20), default="todo")
+    done: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
 class Settings(Base):
     __tablename__ = "settings"
     key: Mapped[str] = mapped_column(String(100), primary_key=True)
@@ -205,12 +217,30 @@ class GoalIn(BaseModel):
     year: int | None = None
     progress: int = Field(default=0, ge=0, le=100)
 
+class GoalUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    horizon: str | None = None
+    area: str | None = None
+    year: int | None = None
+    progress: int | None = Field(default=None, ge=0, le=100)
+    active: bool | None = None
+
 class ProjectIn(BaseModel):
     title: str
     description: str | None = None
     area: str = "work"
     progress: int = Field(default=0, ge=0, le=100)
     next_action: str | None = None
+    status: str = "active"
+
+class ProjectUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    area: str | None = None
+    progress: int | None = Field(default=None, ge=0, le=100)
+    next_action: str | None = None
+    status: str | None = None
 
 class VisionIn(BaseModel):
     horizon: str
@@ -227,6 +257,18 @@ class JournalIn(BaseModel):
     day: date
     category: str = "note"
     content: str
+
+class MatrixIn(BaseModel):
+    title: str
+    note: str | None = None
+    quadrant: int = Field(default=2, ge=1, le=4)
+    kind: str = "todo"
+
+class MatrixUpdate(BaseModel):
+    title: str | None = None
+    note: str | None = None
+    quadrant: int | None = Field(default=None, ge=1, le=4)
+    done: bool | None = None
 
 class OllamaSettings(BaseModel):
     enabled: bool = False
@@ -308,6 +350,17 @@ def create_goal(payload: GoalIn):
         db.add(goal); db.commit(); db.refresh(goal)
         return serialize(goal)
 
+@app.put("/api/goals/{item_id}")
+def update_goal(item_id: int, payload: GoalUpdate):
+    with Session(engine) as db:
+        goal = db.get(Goal, item_id)
+        if not goal:
+            raise HTTPException(404, "Goal not found")
+        for key, value in payload.model_dump(exclude_unset=True).items():
+            setattr(goal, key, value)
+        db.commit(); db.refresh(goal)
+        return serialize(goal)
+
 @app.get("/api/projects")
 def list_projects():
     with Session(engine) as db:
@@ -318,6 +371,17 @@ def create_project(payload: ProjectIn):
     with Session(engine) as db:
         project = Project(**payload.model_dump())
         db.add(project); db.commit(); db.refresh(project)
+        return serialize(project)
+
+@app.put("/api/projects/{item_id}")
+def update_project(item_id: int, payload: ProjectUpdate):
+    with Session(engine) as db:
+        project = db.get(Project, item_id)
+        if not project:
+            raise HTTPException(404, "Project not found")
+        for key, value in payload.model_dump(exclude_unset=True).items():
+            setattr(project, key, value)
+        db.commit(); db.refresh(project)
         return serialize(project)
 
 @app.get("/api/visions")
@@ -359,6 +423,39 @@ def create_journal(payload: JournalIn):
         item = JournalEntry(**payload.model_dump())
         db.add(item); db.commit(); db.refresh(item)
         return serialize(item)
+
+@app.get("/api/matrix")
+def list_matrix():
+    with Session(engine) as db:
+        rows = db.scalars(select(MatrixItem).order_by(MatrixItem.quadrant, MatrixItem.created_at.desc())).all()
+        return [serialize(x) for x in rows]
+
+@app.post("/api/matrix")
+def create_matrix_item(payload: MatrixIn):
+    with Session(engine) as db:
+        item = MatrixItem(**payload.model_dump())
+        db.add(item); db.commit(); db.refresh(item)
+        return serialize(item)
+
+@app.put("/api/matrix/{item_id}")
+def update_matrix_item(item_id: int, payload: MatrixUpdate):
+    with Session(engine) as db:
+        item = db.get(MatrixItem, item_id)
+        if not item:
+            raise HTTPException(404, "Matrix item not found")
+        for key, value in payload.model_dump(exclude_unset=True).items():
+            setattr(item, key, value)
+        db.commit(); db.refresh(item)
+        return serialize(item)
+
+@app.delete("/api/matrix/{item_id}")
+def delete_matrix_item(item_id: int):
+    with Session(engine) as db:
+        item = db.get(MatrixItem, item_id)
+        if not item:
+            raise HTTPException(404, "Matrix item not found")
+        db.delete(item); db.commit()
+    return {"deleted": item_id}
 
 @app.get("/api/insights")
 def insights(days: int = Query(30, ge=7, le=3650)):
@@ -431,6 +528,20 @@ async def build_context(day: date, include_sensitive: bool = False) -> dict[str,
         data["trade_note"] = None
     return {"today": data, "previous_30_days": [serialize(x) for x in previous], "goals": [serialize(x) for x in goals], "projects": [serialize(x) for x in projects]}
 
+@app.get("/api/ollama/models")
+async def list_ollama_models():
+    """Lists the models actually loaded on the Ollama server so that one
+    can be selected in the UI instead of typing a name blindly."""
+    settings = get_ollama_settings()
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            response = await client.get(f"{settings['url']}/api/tags")
+            response.raise_for_status()
+            data = response.json()
+    except Exception as exc:
+        raise HTTPException(502, f"Ollama nicht erreichbar unter {settings['url']}: {exc}")
+    return {"url": settings["url"], "models": sorted(m.get("name", "") for m in data.get("models", []) if m.get("name"))}
+
 @app.post("/api/ollama/briefing/{day}")
 async def ollama_briefing(day: date):
     settings = get_ollama_settings()
@@ -441,8 +552,12 @@ async def ollama_briefing(day: date):
     try:
         async with httpx.AsyncClient(timeout=90) as client:
             response = await client.post(f"{settings['url']}/api/generate", json={"model": settings["model"], "prompt": prompt, "stream": False})
-            response.raise_for_status()
+            if response.status_code != 200:
+                detail = response.text[:300] or "keine Details"
+                raise HTTPException(502, f"Ollama-Fehler {response.status_code} fuer Modell '{settings['model']}': {detail}")
             result = response.json()
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(502, f"Ollama request failed: {exc}")
     return {"model": settings["model"], "response": result.get("response", "")}
