@@ -207,7 +207,8 @@ msg_ok "Frontend gebaut"
 msg_info "Erstelle systemd-Dienst (bulletjournal.service)"
 pct exec "$CTID" -- env BJ_PW="$APP_PW" bash <<'BJ_SETUP'
 set -e
-cat <<'SVCEOF' > /etc/systemd/system/bulletjournal.service
+{
+  cat <<'SVCEOF'
 [Unit]
 Description=BulletJournal Life-OS
 After=network.target
@@ -221,14 +222,18 @@ Restart=always
 RestartSec=10
 Environment=PYTHONUNBUFFERED=1
 Environment=BULLETJOURNAL_DATA_DIR=/opt/bulletjournal/data
+SVCEOF
+  # WICHTIG: muss INNERHALB der [Service]-Sektion stehen (vor [Install]),
+  # sonst ignoriert systemd die Zeile und der Passwortschutz ist aus!
+  if [[ -n "$BJ_PW" ]]; then
+    echo "Environment=BULLETJOURNAL_PASSWORD=$BJ_PW"
+  fi
+  cat <<'SVCEOF'
 
 [Install]
 WantedBy=multi-user.target
 SVCEOF
-
-if [[ -n "$BJ_PW" ]]; then
-  echo "Environment=BULLETJOURNAL_PASSWORD=$BJ_PW" >> /etc/systemd/system/bulletjournal.service
-fi
+} > /etc/systemd/system/bulletjournal.service
 
 systemctl daemon-reload
 systemctl enable --now bulletjournal >/dev/null 2>&1
@@ -254,6 +259,16 @@ pct exec "$CTID" -- curl -fsS http://localhost:8000/api/health >/dev/null \
 pct exec "$CTID" -- bash -c 'curl -fsS http://localhost:8000/ | grep -q "<script"' \
   || die "Frontend wird nicht korrekt ausgeliefert (index.html ohne Build-Assets)."
 msg_ok "Installation verifiziert"
+
+if [[ -n "$APP_PW" ]]; then
+  msg_info "Pruefe Passwortschutz"
+  CODE=$(pct exec "$CTID" -- bash -c 'curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/')
+  if [[ "$CODE" =~ ^(301|302|307|308)$ ]]; then
+    msg_ok "Passwortschutz aktiv (Login erforderlich)"
+  else
+    die "Passwortschutz NICHT aktiv (HTTP $CODE statt Login-Redirect)! Service-Unit pruefen: systemctl cat bulletjournal"
+  fi
+fi
 
 # ── IP ermitteln ────────────────────────────────────────────────────
 msg_info "Ermittle Container-IP"

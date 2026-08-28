@@ -218,7 +218,7 @@ if PASSWORD:
 
     def _make_token() -> str:
         exp = int(time.time()) + 60 * 60 * 24 * 30
-        sig = hmac.new(_SECRET.encode(), f"bj:{exp}".encode(), hashlib.sha256).hexdigest()
+        sig = hmac.new(_SECRET.encode(), f"bj:{exp}:{PASSWORD}".encode(), hashlib.sha256).hexdigest()
         return f"{exp}.{sig}"
 
     def _valid_session(token: str | None) -> bool:
@@ -226,7 +226,7 @@ if PASSWORD:
             exp, sig = token.split(".", 1)
             if int(exp) < time.time():
                 return False
-            expected = hmac.new(_SECRET.encode(), f"bj:{exp}".encode(), hashlib.sha256).hexdigest()
+            expected = hmac.new(_SECRET.encode(), f"bj:{exp}:{PASSWORD}".encode(), hashlib.sha256).hexdigest()
             return hmac.compare_digest(sig, expected)
         except Exception:
             return False
