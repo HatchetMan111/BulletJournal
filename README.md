@@ -127,7 +127,8 @@ In den Einstellungen der App Ollama aktivieren und URL/Modell konfigurieren.
 | `GET` | `/api/health` | Gesundheitscheck |
 | `GET` | `/api/meta` | Lebensbereiche & heute |
 | `GET` | `/api/dashboard` | Dashboard-Daten (heute, gestern, letzte 7 Tage) |
-| `GET/PUT` | `/api/daily/{day}` | Tageseintrag lesen/schreiben |
+| `GET` | `/api/daily/{day}` | Tageseintrag lesen |
+| `PUT` | `/api/daily` | Tageseintrag schreiben (Tag im Body) |
 | `GET` | `/api/daily?days=90` | Letzte X Tage auflisten |
 | `GET` | `/api/insights?days=30` | Statistiken & Trends |
 | `GET/POST` | `/api/goals` | Ziele verwalten |

@@ -450,9 +450,13 @@ async def ollama_briefing(day: date):
 # Serve frontend in production when present.
 DIST = BASE_DIR / "frontend" / "dist"
 if DIST.exists():
+    _DIST_ROOT = DIST.resolve()
+
     @app.get("/{path:path}")
     def frontend(path: str):
-        candidate = DIST / path
-        if candidate.is_file():
+        if path.startswith("api/"):
+            raise HTTPException(404, "Not found")
+        candidate = (DIST / path).resolve()
+        if candidate.is_file() and candidate.is_relative_to(_DIST_ROOT):
             return FileResponse(candidate)
         return FileResponse(DIST / "index.html")

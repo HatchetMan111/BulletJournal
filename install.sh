@@ -40,7 +40,7 @@ function header_info {
 EOF
 }
 
-function msg_info() { echo -ne "${YW}⠿ ${CL}${BL}${1}${CL}"; }
+function msg_info() { echo -e "${YW}● ${CL}${BL}${1}...${CL}"; }
 function msg_ok()   { echo -e "${CM} ${GN}${1}${CL}"; }
 function msg_error(){ echo -e "${CR} ${RD}${1}${CL}"; }
 
@@ -117,11 +117,11 @@ pct create "$CTID" "$TEMPLATE" \
   --unprivileged 1 \
   --onboot 1 \
   --startup order=2 \
-  --features nesting=1 >/dev/null 2>&1
+  --features nesting=1 >/dev/null
 msg_ok "Container erstellt"
 
 msg_info "Starte Container"
-pct start "$CTID" >/dev/null 2>&1
+pct start "$CTID" >/dev/null
 msg_ok "Container gestartet"
 
 # ── Auf Netzwerk warten ─────────────────────────────────────────────
@@ -140,6 +140,7 @@ msg_ok "Netzwerk bereit"
 # ── Grundpakete installieren ────────────────────────────────────────
 msg_info "Installiere Grundpakete (curl, git, python3, venv)"
 pct exec "$CTID" -- bash <<'BJ_SETUP'
+set -e
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 apt-get install -y -qq curl git ca-certificates python3 python3-venv python3-pip >/dev/null
@@ -149,6 +150,7 @@ msg_ok "Grundpakete installiert"
 # ── BulletJournal klonen (VOR dem Anlegen von Unterverzeichnissen!) ─
 msg_info "Klone BulletJournal aus GitHub"
 pct exec "$CTID" -- bash <<'BJ_SETUP'
+set -e
 rm -rf /opt/bulletjournal
 git clone --depth 1 https://github.com/HatchetMan111/BulletJournal.git /opt/bulletjournal
 rm -rf /opt/bulletjournal/.git
@@ -159,6 +161,7 @@ msg_ok "BulletJournal geklont"
 # ── Python-Pakete in venv installieren (Debian 12: kein System-Pip) ─
 msg_info "Installiere Python-Pakete in venv (FastAPI, Uvicorn, SQLAlchemy, httpx, pydantic)"
 pct exec "$CTID" -- bash <<'BJ_SETUP'
+set -e
 python3 -m venv /opt/bulletjournal/venv
 /opt/bulletjournal/venv/bin/pip install --quiet --upgrade pip
 /opt/bulletjournal/venv/bin/pip install --quiet fastapi uvicorn sqlalchemy httpx pydantic
@@ -168,6 +171,7 @@ msg_ok "Python-Pakete installiert"
 # ── Frontend bauen (Vite/React -> statische Dateien) ────────────────
 msg_info "Installiere Node.js und baue Frontend"
 pct exec "$CTID" -- bash <<'BJ_SETUP'
+set -e
 export DEBIAN_FRONTEND=noninteractive
 apt-get install -y -qq nodejs npm >/dev/null
 node --version
@@ -181,6 +185,7 @@ msg_ok "Frontend gebaut"
 # ── systemd-Dienst einrichten ───────────────────────────────────────
 msg_info "Erstelle systemd-Dienst (bulletjournal.service)"
 pct exec "$CTID" -- bash <<'BJ_SETUP'
+set -e
 cat <<'SVCEOF' > /etc/systemd/system/bulletjournal.service
 [Unit]
 Description=BulletJournal Life-OS
