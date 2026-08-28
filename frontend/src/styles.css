@@ -234,3 +234,21 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   .focus h3{font-size:17px}
   .day-chip{min-width:50px;padding:8px 5px}
 }
+
+/* === Tages-Fortschritt Ziele/Projekte === */
+.dayprogress{display:grid;gap:10px}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) 70px 54px 42px;gap:8px;align-items:center}
+.prow .ptitle{font-size:13px;font-weight:700;color:#172033;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow .track{height:8px;background:#ececea;border-radius:99px;overflow:hidden}
+.prow .fill{height:100%;background:#172033;border-radius:99px;transition:width .15s}
+.prow input{width:100%;text-align:center;border:1px solid #dfe3e8;border-radius:8px;padding:6px 4px;background:#fbfbfa;font:inherit;font-size:14px;color:#172033}
+.prow .pdelta{font-size:11px;font-weight:800;text-align:right}
+.customchecks{display:grid;gap:8px;margin-top:10px}
+.customchecks .addcheck{margin-top:2px}
+@media(max-width:480px){.prow{grid-template-columns:minmax(0,1fr) 50px 38px}.prow .track{display:none}}
+
+/* === Check-Verwaltung (Einstellungen) === */
+.chklist{display:grid;gap:6px;margin:10px 0 2px}
+.chkrow{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid #e9ebee;background:#fbfbfa;border-radius:10px;padding:8px 12px;font-size:13.5px;color:#172033}
+.chkrow button{border:0;background:transparent;color:#9aa3b2;cursor:pointer;padding:3px;border-radius:6px}
+.chkrow button:hover{color:#ef4444;background:#fdf1f1}

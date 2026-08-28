@@ -147,6 +147,15 @@ class DailyCheckDone(Base):
     check_id: Mapped[int] = mapped_column(Integer, index=True)
     done: Mapped[bool] = mapped_column(Boolean, default=True)
 
+class DailyProgress(Base):
+    """Tagesweise Fortschritte an Zielen und Projekten (in Prozent)."""
+    __tablename__ = "daily_progress"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    day: Mapped[date] = mapped_column(Date, index=True)
+    kind: Mapped[str] = mapped_column(String(10))  # goal | project
+    ref_id: Mapped[int] = mapped_column(Integer, index=True)
+    percent: Mapped[int] = mapped_column(Integer, default=0)
+
 class Settings(Base):
     __tablename__ = "settings"
     key: Mapped[str] = mapped_column(String(100), primary_key=True)
@@ -678,6 +687,46 @@ def toggle_check(day: date, payload: CheckToggleIn):
             row.done = payload.done
         db.commit()
     return {"day": day.isoformat(), "check_id": payload.check_id, "done": payload.done}
+
+class ProgressItemIn(BaseModel):
+    kind: str  # goal | project
+    ref_id: int
+    percent: int = Field(default=0, ge=0, le=100)
+
+    @field_validator("percent", mode="before")
+    @classmethod
+    def _clamp_percent(cls, v: Any) -> int:
+        v = _parse_number(v)
+        return 0 if v is None else max(0, min(100, int(round(v))))
+
+@app.get("/api/progress/{day}")
+def get_day_progress(day: date):
+    with Session(engine) as db:
+        rows = db.scalars(select(DailyProgress).where(DailyProgress.day == day)).all()
+        return [{"kind": r.kind, "ref_id": r.ref_id, "percent": r.percent} for r in rows]
+
+@app.put("/api/progress/{day}")
+def set_day_progress(day: date, items: list[ProgressItemIn]):
+    """Setzt den an einem Tag erreichten Stand von Zielen/Projekten:
+     1) ersetzt die Tages-Eintraege, 2) uebernimmt den Stand ins Ziel/Projekt."""
+    with Session(engine) as db:
+        for old in db.scalars(select(DailyProgress).where(DailyProgress.day == day)).all():
+            db.delete(old)
+        saved = 0
+        for it in items:
+            if it.kind == "goal":
+                ent = db.get(Goal, it.ref_id)
+            elif it.kind == "project":
+                ent = db.get(Project, it.ref_id)
+            else:
+                continue
+            if not ent:
+                continue
+            ent.progress = it.percent
+            db.add(DailyProgress(day=day, kind=it.kind, ref_id=it.ref_id, percent=it.percent))
+            saved += 1
+        db.commit()
+    return {"day": day.isoformat(), "saved": saved}
 
 @app.get("/api/insights")
 def insights(days: int = Query(30, ge=7, le=3650)):

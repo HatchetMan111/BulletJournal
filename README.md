@@ -145,6 +145,7 @@ In den Einstellungen der App Ollama aktivieren und URL/Modell konfigurieren.
 | `GET/PUT` | `/api/visions` | Visionen (10y/5y/1y) |
 | `PUT` | `/api/checks/{day}` | Eigene Check-Punkte pro Tag abhaken |
 | `GET/POST/DELETE` | `/api/checks` | Eigene Check-Punkte verwalten |
+| `GET/PUT` | `/api/progress/{day}` | Tages-Fortschritt an Zielen/Projekten (%) |
 | `GET/POST` | `/api/trackers` | Tracker verwalten |
 | `GET/POST` | `/api/journal` | Journal-Einträge |
 | `GET` | `/api/export` | Daten als JSON exportieren |

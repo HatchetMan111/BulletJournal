@@ -15,6 +15,10 @@ const today = fmtISO(new Date());
 function addDays(dayStr, n) { const d = new Date(dayStr + 'T12:00:00'); d.setDate(d.getDate() + n); return fmtISO(d); }
 // Akzeptiert both 7.5 and 7,5 (deutsche Schreibweise)
 function num(v) { if (v == null) return null; const s = String(v).trim().replace(',', '.'); if (s === '') return null; const n = Number(s); return Number.isFinite(n) ? n : null; }
+// Anzeige mit deutschem Komma; Eingabefelder behalten den Rohtext
+// (Konvertierung passiert erst im Backend beim Speichern - sonst wird
+//  das Komma beim Tippen sofort verschluckt: "7," -> 7 -> "75")
+function showNum(v) { if (v == null || v === '') return ''; return String(v).replace('.', ','); }
 function formatDate(v) { return new Date(v + 'T12:00:00').toLocaleDateString('de-DE', {day: '2-digit', month: 'long', year: 'numeric'}); }
 function formatShort(v) { return new Date(v + 'T12:00:00').toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'}); }
 
@@ -165,8 +169,8 @@ function Today({entry, update, save, setPage, saved, yesterdayEntry, onToggleTop
         <div className="quick-stats">
           <Field label="Tagesrating"><input type="number" min="1" max="10" value={entry.day_rating || ''} onChange={e => update('day_rating', num(e.target.value))}/></Field>
           <Field label="Produktivität"><input type="number" min="1" max="10" value={entry.productivity || ''} onChange={e => update('productivity', num(e.target.value))}/></Field>
-          <Field label="Schlaf (h)"><input type="text" inputMode="decimal" placeholder="z.B. 7,5" value={entry.sleep_hours ?? ''} onChange={e => update('sleep_hours', num(e.target.value))}/></Field>
-          <Field label="Wasser (L)"><input type="text" inputMode="decimal" placeholder="z.B. 1,5" value={entry.water_liters ?? ''} onChange={e => update('water_liters', num(e.target.value))}/></Field>
+          <Field label="Schlaf (h)"><input type="text" inputMode="decimal" placeholder="z.B. 7,5" value={showNum(entry.sleep_hours)} onChange={e => update('sleep_hours', e.target.value)}/></Field>
+          <Field label="Wasser (L)"><input type="text" inputMode="decimal" placeholder="z.B. 1,5" value={showNum(entry.water_liters)} onChange={e => update('water_liters', e.target.value)}/></Field>
         </div>
       </Card>
 
@@ -222,19 +226,19 @@ function Today({entry, update, save, setPage, saved, yesterdayEntry, onToggleTop
   </div>;
 }
 
-// ---- Daily Check inkl. eigener Check-Punkte -----------------------------
-function DailyCheckCard({entry, update}) {
+// ---- Eigene Check-Punkte: Toggles + Anlegen, ueberall wiederverwendbar ---
+function CustomChecksBlock({day, allowDelete = false}) {
   const [custom, setCustom] = useState([]);
   const [done, setDone] = useState([]);
   const [name, setName] = useState('');
   useEffect(() => {
     api('/checks').then(setCustom).catch(() => {});
-    api('/checks/' + today).then(d => setDone(d.done)).catch(() => {});
-  }, []);
-  const toggleCustom = c => {
+    api('/checks/' + day).then(d => setDone(d.done)).catch(() => {});
+  }, [day]);
+  const toggle = c => {
     const nd = done.includes(c.id) ? done.filter(x => x !== c.id) : [...done, c.id];
     setDone(nd);
-    api('/checks/' + today, {method: 'PUT', body: JSON.stringify({check_id: c.id, done: nd.includes(c.id)})}).catch(() => {});
+    api('/checks/' + day, {method: 'PUT', body: JSON.stringify({check_id: c.id, done: nd.includes(c.id)})}).catch(() => {});
   };
   const add = async () => {
     if (!name.trim()) return;
@@ -248,6 +252,24 @@ function DailyCheckCard({entry, update}) {
     setCustom(cs => cs.filter(x => x.id !== c.id));
     await api('/checks/' + c.id, {method: 'DELETE'}).catch(() => {});
   };
+  return <div className="customchecks">
+    {custom.map(c => <div key={c.id} className={'toggle custom' + (done.includes(c.id) ? ' on' : '')}>
+      <button type="button" className="cbtn" onClick={() => toggle(c)}>
+        <span>{done.includes(c.id) ? '✓' : '○'}</span>{c.icon} {c.name}
+      </button>
+      {allowDelete && <button type="button" className="cdel" title="Check-Punkt entfernen" onClick={() => del(c)}><X size={12}/></button>}
+    </div>)}
+    <div className="addcheck">
+      <input placeholder="Eigener Punkt, z.B. 🧘 Meditiert" value={name}
+        onChange={e => setName(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') add(); }}/>
+      <button className="secondary" onClick={add}><CirclePlus size={15}/> Hinzufügen</button>
+    </div>
+  </div>;
+}
+
+// ---- Daily Check inkl. eigener Check-Punkte -----------------------------
+function DailyCheckCard({entry, update}) {
   return <Card>
     <div className="card-head"><h3>Daily Check</h3><span className="muted">kleine Dinge, große Wirkung</span></div>
     <div className="checks">
@@ -257,20 +279,54 @@ function DailyCheckCard({entry, update}) {
       <Toggle label="🍳 Selbst gekocht" value={!!entry.self_cooked} onChange={v => update('self_cooked', v)}/>
       <Toggle label="👤 Neues kennengelernt" value={!!entry.new_person} onChange={v => update('new_person', v)}/>
       <Toggle label="💼 Neuer Kunde" value={!!entry.new_customer} onChange={v => update('new_customer', v)}/>
-      {custom.map(c => <div key={c.id} className={'toggle custom' + (done.includes(c.id) ? ' on' : '')}>
-        <button type="button" className="cbtn" onClick={() => toggleCustom(c)}>
-          <span>{done.includes(c.id) ? '✓' : '○'}</span>{c.icon} {c.name}
-        </button>
-        <button type="button" className="cdel" title="Check-Punkt entfernen" onClick={() => del(c)}><X size={12}/></button>
-      </div>)}
     </div>
-    <div className="addcheck">
-      <input placeholder="Eigener Punkt, z.B. 🧘 Meditiert" value={name}
-        onChange={e => setName(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') add(); }}/>
-      <button className="secondary" onClick={add}><CirclePlus size={15}/> Hinzufügen</button>
-    </div>
+    <CustomChecksBlock day={today} allowDelete/>
   </Card>;
+}
+
+// ---- Tages-Fortschritt an Zielen & Projekten (Prozent) ------------------
+function DayProgressSection({day}) {
+  const [rows, setRows] = useState(null);
+  const [saved, setSaved] = useState('');
+  useEffect(() => {
+    setRows(null); setSaved('');
+    Promise.all([api('/goals'), api('/projects'), api('/progress/' + day)])
+      .then(([g, p, cur]) => {
+        const map = {};
+        for (const r of (cur || [])) map[r.kind + ':' + r.ref_id] = r.percent;
+        const list = [
+          ...g.filter(x => x.active !== false && (x.progress || 0) < 100)
+            .map(x => ({kind: 'goal', ref_id: x.id, title: '🎯 ' + x.title, initial: x.progress || 0})),
+          ...p.filter(x => (x.status || 'active') !== 'done')
+            .map(x => ({kind: 'project', ref_id: x.id, title: '📦 ' + x.title, initial: x.progress || 0})),
+        ].map(r => ({...r, percent: map[r.kind + ':' + r.ref_id] ?? r.initial}));
+        setRows(list);
+      })
+      .catch(() => setRows([]));
+  }, [day]);
+  if (rows === null) return <div className="empty-inline">Lädt …</div>;
+  if (rows.length === 0) return <p className="muted small">Keine aktiven Ziele oder Projekte – lege welche an und bewege sie hier täglich in Prozent.</p>;
+  const setP = (i, v) => setRows(rs => rs.map((r, j) => j === i ? {...r, percent: Math.max(0, Math.min(100, num(v) || 0))} : r));
+  const save = async () => {
+    try {
+      await api('/progress/' + day, {method: 'PUT', body: JSON.stringify(rows.map(({kind, ref_id, percent}) => ({kind, ref_id, percent})))});
+      setSaved('Übernommen ✓');
+      setRows(rs => rs.map(r => ({...r, initial: r.percent})));
+      setTimeout(() => setSaved(''), 2000);
+    } catch (e) { setSaved('Fehler beim Speichern'); }
+  };
+  return <div className="dayprogress">
+    {rows.map((r, i) => <div key={r.kind + ':' + r.ref_id} className="prow">
+      <span className="ptitle">{r.title}</span>
+      <div className="track"><div className="fill" style={{width: r.percent + '%'}}/></div>
+      <input type="number" min="0" max="100" value={r.percent} onChange={e => setP(i, e.target.value)}/>
+      <span className="pdelta" style={{color: r.percent > r.initial ? '#10b981' : r.percent < r.initial ? '#ef4444' : '#94a3b8'}}>
+        {r.percent > r.initial ? '+' + (r.percent - r.initial) : r.percent < r.initial ? '−' + (r.initial - r.percent) : '±0'}
+      </span>
+    </div>)}
+    <div className="button-row"><button className="primary" onClick={save}>{saved || 'Fortschritt übernehmen'}</button></div>
+    <p className="muted small">Der Prozentwert ist der aktuelle Gesamtstand – er wird direkt auf das Ziel/Projekt übernommen und für diesen Tag protokolliert.</p>
+  </div>;
 }
 
 // ---- Uebersicht: alles fuer den Tag auf einer Seite ---------------------
@@ -399,8 +455,8 @@ function DayFormBody({draft, upd}) {
         <Field label="Produktivität (1-10)"><input type="number" min="1" max="10" value={draft.productivity || ''} onChange={e => upd('productivity', num(e.target.value))}/></Field>
         <Field label="Energie (1-10)"><input type="number" min="1" max="10" value={draft.energy || ''} onChange={e => upd('energy', num(e.target.value))}/></Field>
         <Field label="Stress (1-10)"><input type="number" min="1" max="10" value={draft.stress || ''} onChange={e => upd('stress', num(e.target.value))}/></Field>
-        <Field label="Schlaf (h)"><input type="text" inputMode="decimal" placeholder="7,5" value={draft.sleep_hours ?? ''} onChange={e => upd('sleep_hours', num(e.target.value))}/></Field>
-        <Field label="Wasser (L)"><input type="text" inputMode="decimal" placeholder="1,5" value={draft.water_liters ?? ''} onChange={e => upd('water_liters', num(e.target.value))}/></Field>
+        <Field label="Schlaf (h)"><input type="text" inputMode="decimal" placeholder="7,5" value={showNum(draft.sleep_hours)} onChange={e => upd('sleep_hours', e.target.value)}/></Field>
+        <Field label="Wasser (L)"><input type="text" inputMode="decimal" placeholder="1,5" value={showNum(draft.water_liters)} onChange={e => upd('water_liters', e.target.value)}/></Field>
       </div>
     </section>
 
@@ -414,6 +470,7 @@ function DayFormBody({draft, upd}) {
         <Toggle label="👤 Neues kennengelernt" value={!!draft.new_person} onChange={v => upd('new_person', v)}/>
         <Toggle label="💼 Neuer Kunde" value={!!draft.new_customer} onChange={v => upd('new_customer', v)}/>
       </div>
+      <CustomChecksBlock day={draft.day || today}/>
     </section>
 
     <section className="modal-section">
@@ -435,15 +492,20 @@ function DayFormBody({draft, upd}) {
       <div className="top3">{[1, 2, 3].map(n => <Field key={n} label={'0' + n}><input value={draft['tomorrow_' + n] || ''} onChange={e => upd('tomorrow_' + n, e.target.value)} placeholder="Wichtigste Aufgabe …"/></Field>)}</div>
     </section>
 
+    <section className="modal-section">
+      <h4>Ziele &amp; Projekte heute bewegt</h4>
+      <DayProgressSection day={draft.day || today}/>
+    </section>
+
     <button type="button" className="advanced-toggle" onClick={() => setAdvanced(a => !a)}>
       <ChevronDown size={16} className={advanced ? 'rot' : ''}/> Weitere Felder (Ernährung, Finanzen, Notizen)
     </button>
     {advanced && <section className="modal-section">
       <div className="quick-stats modal-grid">
-        <Field label="Protein (g)"><input type="text" inputMode="decimal" value={draft.protein_grams ?? ''} onChange={e => upd('protein_grams', num(e.target.value))}/></Field>
-        <Field label="Gespart (€)"><input type="text" inputMode="decimal" value={draft.money_saved ?? ''} onChange={e => upd('money_saved', num(e.target.value))}/></Field>
-        <Field label="Verdient (€)"><input type="text" inputMode="decimal" value={draft.money_earned ?? ''} onChange={e => upd('money_earned', num(e.target.value))}/></Field>
-        <Field label="Ausgaben (€)"><input type="text" inputMode="decimal" value={draft.expenses ?? ''} onChange={e => upd('expenses', num(e.target.value))}/></Field>
+        <Field label="Protein (g)"><input type="text" inputMode="decimal" value={showNum(draft.protein_grams)} onChange={e => upd('protein_grams', e.target.value)}/></Field>
+        <Field label="Gespart (€)"><input type="text" inputMode="decimal" value={showNum(draft.money_saved)} onChange={e => upd('money_saved', e.target.value)}/></Field>
+        <Field label="Verdient (€)"><input type="text" inputMode="decimal" value={showNum(draft.money_earned)} onChange={e => upd('money_earned', e.target.value)}/></Field>
+        <Field label="Ausgaben (€)"><input type="text" inputMode="decimal" value={showNum(draft.expenses)} onChange={e => upd('expenses', e.target.value)}/></Field>
       </div>
       <div className="text-grid">
         <Field label="🍽️ Essensnotiz"><textarea value={draft.food_note || ''} onChange={e => upd('food_note', e.target.value)}/></Field>
@@ -510,6 +572,40 @@ function DayEditorModal({initialDay, onClose, onSaved}) {
       </>}
     </div>
   </div>;
+}
+
+// ---- Eigene Daily-Check-Punkte verwalten (Einstellungen) ----------------
+function CheckManager() {
+  const [items, setItems] = useState([]);
+  const [name, setName] = useState('');
+  const load = () => { api('/checks').then(setItems).catch(() => {}); };
+  useEffect(() => { load(); }, []);
+  const add = async () => {
+    if (!name.trim()) return;
+    try {
+      const x = await api('/checks', {method: 'POST', body: JSON.stringify({name})});
+      setItems(xs => [...xs, x]);
+      setName('');
+    } catch (e) {}
+  };
+  const del = async c => {
+    setItems(xs => xs.filter(x => x.id !== c.id));
+    await api('/checks/' + c.id, {method: 'DELETE'}).catch(() => {});
+  };
+  return <Card>
+    <div className="card-head"><h3>Eigene Daily-Check-Punkte</h3><Check/></div>
+    <p className="muted">Deine eigenen Gewohnheiten für den täglichen Daily Check – zusätzlich zu den sechs festen Punkten.</p>
+    <div className="chklist">
+      {items.map(c => <div key={c.id} className="chkrow"><span>{c.icon} {c.name}</span><button title="Entfernen" onClick={() => del(c)}><X size={13}/></button></div>)}
+      {items.length === 0 && <p className="muted small">Noch keine eigenen Punkte angelegt.</p>}
+    </div>
+    <div className="addcheck">
+      <input placeholder="Neuer Punkt, z.B. 🧘 Meditiert" value={name}
+        onChange={e => setName(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') add(); }}/>
+      <button className="secondary" onClick={add}><CirclePlus size={15}/> Hinzufügen</button>
+    </div>
+  </Card>;
 }
 
 // =========================================================================
@@ -943,6 +1039,7 @@ function Settings() {
       {test && <pre className={'ai-result' + (test.startsWith('✓') ? ' okline' : '')}>{test}</pre>}
       {result && <pre className="ai-result">{result}</pre>}
     </Card>
+    <Card><div className="card-head"><h3>Eigene Check-Punkte</h3><Check/></div><CheckManager/></Card>
     <Card><div className="card-head"><h3>Daten</h3><Wallet/></div><p className="muted">Deine Daten bleiben lokal. Exportiere regelmäßig ein Backup.</p><a className="primary linkbtn" href={API + '/export'}>JSON Export</a></Card>
   </div>;
 }
