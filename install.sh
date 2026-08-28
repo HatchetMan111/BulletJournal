@@ -162,7 +162,7 @@ msg_ok "Netzwerk bereit"
 msg_info "Installiere Grundpakete (curl, git, python3, venv)"
 pct exec "$CTID" -- bash <<'BJ_SETUP'
 set -e
-export DEBIAN_FRONTEND=noninteractive
+export DEBIAN_FRONTEND=noninteractive LC_ALL=C LANG=C
 apt-get update -qq
 apt-get install -y -qq curl git ca-certificates python3 python3-venv python3-pip >/dev/null
 BJ_SETUP
@@ -193,7 +193,7 @@ msg_ok "Python-Pakete installiert"
 msg_info "Installiere Node.js und baue Frontend"
 pct exec "$CTID" -- bash <<'BJ_SETUP'
 set -e
-export DEBIAN_FRONTEND=noninteractive
+export DEBIAN_FRONTEND=noninteractive LC_ALL=C LANG=C
 apt-get install -y -qq nodejs npm >/dev/null
 node --version
 cd /opt/bulletjournal/frontend
@@ -265,8 +265,18 @@ if [[ -z "$SVC_OK" ]]; then
 fi
 pct exec "$CTID" -- curl -fsS http://localhost:8000/api/health >/dev/null \
   || die "API antwortet nicht auf http://localhost:8000/api/health"
-pct exec "$CTID" -- bash -c 'curl -fsS http://localhost:8000/ | grep -q "<script"' \
-  || die "Frontend wird nicht korrekt ausgeliefert (index.html ohne Build-Assets)."
+# Hinweis: Mit Passwort leitet / auf /login weiter (302) - das ist dann ERFOLG,
+# daher muss die Frontend-Pruefung beide Faelle behandeln.
+FRONT_CODE=$(pct exec "$CTID" -- bash -c 'curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/')
+if [[ "$FRONT_CODE" == "200" ]]; then
+  pct exec "$CTID" -- bash -c 'curl -fsS http://localhost:8000/ | grep -q "<script"' \
+    || die "Frontend wird nicht korrekt ausgeliefert (index.html ohne Build-Assets)."
+elif [[ "$FRONT_CODE" =~ ^(301|302|307|308)$ ]]; then
+  pct exec "$CTID" -- bash -c 'curl -fsS http://localhost:8000/login | grep -q "Anmelden"' \
+    || die "Login-Seite wird nicht korrekt ausgeliefert."
+else
+  die "Frontend antwortet nicht (HTTP $FRONT_CODE)."
+fi
 msg_ok "Installation verifiziert"
 
 if [[ -n "$APP_PW" ]]; then
