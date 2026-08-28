@@ -221,3 +221,16 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   .overview-save{margin-top:10px}
   .overview-save .primary{width:100%}
 }
+
+/* === Heute-Seite: kein horizontales Ueberlaufen mehr === */
+@media(max-width:900px){
+  /* minmax(0,..) statt 1fr: der 7-Tage-Strip (~440px Mindestbreite)
+     durfte die ganze Grid-Spalte aufspannen -> alles ragte raus */
+  .content-grid,.vision-grid{grid-template-columns:minmax(0,1fr)}
+  .main-col,.side-col,.content-grid .card{min-width:0;max-width:100%}
+  /* Hauptinhalt zuerst (Stimmung, Checks, Reflexion), Seitenkarten danach */
+  .side-col{order:2}
+  .focus{padding:14px}
+  .focus h3{font-size:17px}
+  .day-chip{min-width:50px;padding:8px 5px}
+}
