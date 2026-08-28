@@ -184,7 +184,11 @@ app = FastAPI(title="BulletJournal API", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # ── Optionaler Passwortschutz (BULLETJOURNAL_PASSWORD) ──────────────
+# Quelle 1: Environment-Variable, Quelle 2: Datei data/app.password
 PASSWORD = os.getenv("BULLETJOURNAL_PASSWORD", "").strip()
+_PW_FILE = DATA_DIR / "app.password"
+if not PASSWORD and _PW_FILE.exists():
+    PASSWORD = _PW_FILE.read_text().strip()
 
 LOGIN_HTML = """<!DOCTYPE html>
 <html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -448,7 +452,8 @@ def serialize(model: Any) -> dict[str, Any]:
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "app": "BulletJournal", "version": app.version}
+    # auth-Flag ist bewusst oeffentlich: so sieht man sofort, ob Schutz aktiv ist
+    return {"status": "ok", "app": "BulletJournal", "version": app.version, "auth": bool(PASSWORD)}
 
 @app.get("/api/meta")
 def meta():

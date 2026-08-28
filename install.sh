@@ -235,6 +235,15 @@ WantedBy=multi-user.target
 SVCEOF
 } > /etc/systemd/system/bulletjournal.service
 
+# Passwort zusaetzlich als Datei (robust, unabhaengig von systemd-Env)
+mkdir -p /opt/bulletjournal/data
+if [[ -n "$BJ_PW" ]]; then
+  printf '%s' "$BJ_PW" > /opt/bulletjournal/data/app.password
+  chmod 600 /opt/bulletjournal/data/app.password
+else
+  rm -f /opt/bulletjournal/data/app.password
+fi
+
 systemctl daemon-reload
 systemctl enable --now bulletjournal >/dev/null 2>&1
 BJ_SETUP

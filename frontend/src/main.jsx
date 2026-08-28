@@ -2,8 +2,8 @@ import React, {useEffect, useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {
   Activity, BookOpen, Brain, Calendar, Check, ChevronDown, ChevronRight, CirclePlus, Columns3,
-  Compass, Dumbbell, Droplets, Home, LayoutGrid, ListTodo, Moon, RefreshCw, Save, Sparkles,
-  Target, TrendingUp, Wallet, X
+  Compass, Dumbbell, Droplets, Home, LayoutGrid, ListTodo, LogOut, Moon, MoreHorizontal, RefreshCw,
+  Save, Sparkles, Target, TrendingUp, Wallet, X
 } from 'lucide-react';
 import './styles.css';
 
@@ -54,6 +54,10 @@ function App() {
   const [insights, setInsights] = useState(null);
   const [toast, setToast] = useState('');
   const [editorDay, setEditorDay] = useState(null); // date string when the day-editor modal is open
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [authOn, setAuthOn] = useState(false);
+
+  useEffect(() => { fetch('/api/health').then(r => r.json()).then(d => setAuthOn(!!d.auth)).catch(() => {}); }, []);
 
   const loadDashboard = () => {
     setLoadingDashboard(true);
@@ -101,7 +105,7 @@ function App() {
     <aside className="sidebar">
       <div className="brand"><div className="logo">BJ</div><div><b>BulletJournal</b><small>Life OS</small></div></div>
       {nav.map(([id, label, Icon]) => <button key={id} className={page === id ? 'nav active' : 'nav'} onClick={() => setPage(id)}><Icon size={19}/>{label}</button>)}
-      <div className="sidebar-foot">lokal · privat · PWA</div>
+      <div className="sidebar-foot">{authOn ? <a className="slogout" href="/logout"><LogOut size={13}/> Abmelden</a> : 'lokal · privat · PWA'}</div>
     </aside>
     <main>
       <header>
@@ -125,7 +129,17 @@ function App() {
       {page === 'insights' && <Insights data={insights}/>}
       {page === 'settings' && <Settings/>}
     </main>
-    <nav className="bottom-nav">{nav.slice(0, 5).map(([id, label, Icon]) => <button key={id} className={page === id ? 'active' : ''} onClick={() => setPage(id)}><Icon size={18}/><small>{label}</small></button>)}</nav>
+    <nav className="bottom-nav">
+      {nav.slice(0, 5).map(([id, label, Icon]) => <button key={id} className={page === id ? 'active' : ''} onClick={() => setPage(id)}><Icon size={18}/><small>{label}</small></button>)}
+      <button className={nav.slice(5).some(([id]) => id === page) ? 'active' : ''} onClick={() => setMoreOpen(true)}><MoreHorizontal size={18}/><small>Mehr</small></button>
+    </nav>
+    {moreOpen && <div className="sheet-overlay" onClick={() => setMoreOpen(false)}>
+      <div className="sheet" onClick={e => e.stopPropagation()}>
+        <div className="shead">Weitere Bereiche</div>
+        {nav.slice(5).map(([id, label, Icon]) => <button key={id} className={page === id ? 'active' : ''} onClick={() => { setPage(id); setMoreOpen(false); }}><Icon size={19}/>{label}</button>)}
+        {authOn && <a className="sheet-logout" href="/logout"><LogOut size={19}/>Abmelden</a>}
+      </div>
+    </div>}
     {toast && <div className="toast">{toast}</div>}
     {editorDay && <DayEditorModal initialDay={editorDay} onClose={closeEditor} onSaved={onEditorSaved}/>}
   </div>;
