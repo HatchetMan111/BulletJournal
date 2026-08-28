@@ -1,13 +1,17 @@
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+import hashlib
+import hmac
 import json
 import os
+import secrets
+import time
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import Boolean, Date, DateTime, Float, Integer, String, Text, create_engine, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
@@ -126,6 +130,23 @@ class MatrixItem(Base):
     done: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+class CheckItem(Base):
+    """Eigene Daily-Check-Punkte, die der Nutzer selbst anlegt."""
+    __tablename__ = "check_items"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    icon: Mapped[str] = mapped_column(String(16), default="✓")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+class DailyCheckDone(Base):
+    """Abgehakte eigene Check-Punkte pro Tag."""
+    __tablename__ = "daily_checks_done"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    day: Mapped[date] = mapped_column(Date, index=True)
+    check_id: Mapped[int] = mapped_column(Integer, index=True)
+    done: Mapped[bool] = mapped_column(Boolean, default=True)
+
 class Settings(Base):
     __tablename__ = "settings"
     key: Mapped[str] = mapped_column(String(100), primary_key=True)
@@ -161,6 +182,87 @@ migrate_schema()
 
 app = FastAPI(title="BulletJournal API", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+# ── Optionaler Passwortschutz (BULLETJOURNAL_PASSWORD) ──────────────
+PASSWORD = os.getenv("BULLETJOURNAL_PASSWORD", "").strip()
+
+LOGIN_HTML = """<!DOCTYPE html>
+<html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BulletJournal – Anmeldung</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📓</text></svg>">
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#111827;font-family:Inter,system-ui,sans-serif;color:#e5e7eb}
+.card{background:#1f2937;border:1px solid #374151;border-radius:18px;padding:34px 30px;width:min(92vw,360px);text-align:center}
+.logo{width:52px;height:52px;border-radius:14px;background:#f4f1e8;color:#111827;display:grid;place-items:center;font-weight:800;font-size:20px;margin:0 auto 14px}
+h1{font-size:19px;margin:0 0 4px}p{color:#9ca3af;font-size:13px;margin:0 0 20px}
+input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid #374151;background:#111827;color:#e5e7eb;font-size:15px;margin-bottom:12px}
+button{width:100%;padding:12px;border:0;border-radius:11px;background:#f4f1e8;color:#111827;font-weight:800;font-size:15px;cursor:pointer}
+button:hover{background:#fff}
+.err{color:#f87171;font-size:13px;min-height:18px;margin-top:10px}
+</style></head><body>
+<div class="card"><div class="logo">BJ</div><h1>BulletJournal</h1><p>Bitte mit Passwort anmelden</p>
+<input type="password" id="pw" placeholder="Passwort" autofocus>
+<button onclick="go()">Anmelden</button><div class="err" id="err"></div></div>
+<script>
+const pw=document.getElementById('pw'),err=document.getElementById('err');
+function go(){fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw.value})})
+.then(r=>{if(r.ok)location='/';else{err.textContent='Falsches Passwort';pw.value='';pw.focus();}}).catch(()=>err.textContent='Server nicht erreichbar');}
+pw.addEventListener('keydown',e=>{if(e.key==='Enter')go();});
+</script></body></html>"""
+
+if PASSWORD:
+    _SECRET_FILE = DATA_DIR / "session.secret"
+    if not _SECRET_FILE.exists():
+        _SECRET_FILE.write_text(secrets.token_hex(32))
+    _SECRET = _SECRET_FILE.read_text().strip()
+
+    def _make_token() -> str:
+        exp = int(time.time()) + 60 * 60 * 24 * 30
+        sig = hmac.new(_SECRET.encode(), f"bj:{exp}".encode(), hashlib.sha256).hexdigest()
+        return f"{exp}.{sig}"
+
+    def _valid_session(token: str | None) -> bool:
+        try:
+            exp, sig = token.split(".", 1)
+            if int(exp) < time.time():
+                return False
+            expected = hmac.new(_SECRET.encode(), f"bj:{exp}".encode(), hashlib.sha256).hexdigest()
+            return hmac.compare_digest(sig, expected)
+        except Exception:
+            return False
+
+    @app.middleware("http")
+    async def auth_middleware(request, call_next):
+        path = request.url.path
+        if path in ("/login", "/logout", "/api/login", "/api/health"):
+            return await call_next(request)
+        if _valid_session(request.cookies.get("bj_session")):
+            return await call_next(request)
+        if path.startswith("/api/"):
+            return JSONResponse({"detail": "Nicht angemeldet"}, status_code=401)
+        return RedirectResponse("/login", status_code=302)
+
+    class LoginIn(BaseModel):
+        password: str
+
+    @app.get("/login")
+    def login_page():
+        return HTMLResponse(LOGIN_HTML)
+
+    @app.post("/api/login")
+    def login(payload: LoginIn):
+        if not hmac.compare_digest(payload.password.encode(), PASSWORD.encode()):
+            time.sleep(0.5)
+            raise HTTPException(401, "Falsches Passwort")
+        response = JSONResponse({"ok": True})
+        response.set_cookie("bj_session", _make_token(), httponly=True, samesite="lax", max_age=60 * 60 * 24 * 30, path="/")
+        return response
+
+    @app.get("/logout")
+    def logout():
+        response = RedirectResponse("/login", status_code=302)
+        response.delete_cookie("bj_session", path="/")
+        return response
 
 AREAS = [
     ("health", "Körper & Gesundheit"), ("mental", "Mental & Emotionen"), ("social", "Familie & Freunde"),
@@ -325,10 +427,18 @@ def dashboard(recent_days: int = Query(7, ge=1, le=60)):
         today_entry = db.scalar(select(DailyEntry).where(DailyEntry.day == day_today))
         yesterday_entry = db.scalar(select(DailyEntry).where(DailyEntry.day == day_yesterday))
         recent = db.scalars(select(DailyEntry).where(DailyEntry.day >= start).order_by(DailyEntry.day)).all()
+        custom_total = len(db.scalars(select(CheckItem).where(CheckItem.active == True)).all())
+        done_custom = 0
+        if yesterday_entry:
+            done_custom = len(db.scalars(select(DailyCheckDone).where(DailyCheckDone.day == day_yesterday, DailyCheckDone.done == True)).all())
+    done_fixed = 0
+    if yesterday_entry:
+        done_fixed = sum(bool(getattr(yesterday_entry, f)) for f in ("running", "strength_training", "reading_30min", "self_cooked", "new_person", "new_customer"))
     return {
         "today": serialize(today_entry) if today_entry else {"day": day_today.isoformat()},
         "yesterday": serialize(yesterday_entry) if yesterday_entry else None,
         "recent": [serialize(r) for r in recent],
+        "checks_yesterday": {"done": done_fixed + done_custom, "total": 6 + custom_total},
     }
 
 @app.get("/api/daily")
@@ -456,6 +566,55 @@ def delete_matrix_item(item_id: int):
             raise HTTPException(404, "Matrix item not found")
         db.delete(item); db.commit()
     return {"deleted": item_id}
+
+class CheckIn(BaseModel):
+    name: str
+    icon: str = "✓"
+
+class CheckToggleIn(BaseModel):
+    check_id: int
+    done: bool
+
+@app.get("/api/checks")
+def list_checks():
+    with Session(engine) as db:
+        rows = db.scalars(select(CheckItem).where(CheckItem.active == True).order_by(CheckItem.id)).all()
+        return [serialize(x) for x in rows]
+
+@app.post("/api/checks")
+def create_check(payload: CheckIn):
+    with Session(engine) as db:
+        item = CheckItem(name=payload.name.strip()[:120], icon=payload.icon.strip()[:4] or "✓")
+        db.add(item); db.commit(); db.refresh(item)
+        return serialize(item)
+
+@app.delete("/api/checks/{item_id}")
+def delete_check(item_id: int):
+    with Session(engine) as db:
+        item = db.get(CheckItem, item_id)
+        if not item:
+            raise HTTPException(404, "Check not found")
+        item.active = False
+        db.commit()
+    return {"deleted": item_id}
+
+@app.get("/api/checks/{day}")
+def checks_for_day(day: date):
+    with Session(engine) as db:
+        rows = db.scalars(select(DailyCheckDone).where(DailyCheckDone.day == day, DailyCheckDone.done == True)).all()
+        return {"done": [r.check_id for r in rows]}
+
+@app.put("/api/checks/{day}")
+def toggle_check(day: date, payload: CheckToggleIn):
+    with Session(engine) as db:
+        row = db.scalar(select(DailyCheckDone).where(DailyCheckDone.day == day, DailyCheckDone.check_id == payload.check_id))
+        if not row:
+            row = DailyCheckDone(day=day, check_id=payload.check_id, done=payload.done)
+            db.add(row)
+        else:
+            row.done = payload.done
+        db.commit()
+    return {"day": day.isoformat(), "check_id": payload.check_id, "done": payload.done}
 
 @app.get("/api/insights")
 def insights(days: int = Query(30, ge=7, le=3650)):

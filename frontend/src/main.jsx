@@ -20,9 +20,9 @@ function formatShort(v) { return new Date(v + 'T12:00:00').toLocaleDateString('d
 
 const moods = ['😞', '😕', '😐', '🙂', '😄', '🤩'];
 const nav = [
-  ['today', 'Heute', Home], ['journal', 'Journal', BookOpen], ['goals', 'Ziele', Target],
-  ['projects', 'Projekte', ListTodo], ['board', 'Board', Columns3], ['matrix', 'Matrix', LayoutGrid],
-  ['vision', 'Vision', Compass], ['analytics', 'Auswertung', Activity],
+  ['today', 'Heute', Home], ['overview', 'Übersicht', Calendar], ['journal', 'Journal', BookOpen],
+  ['goals', 'Ziele', Target], ['projects', 'Projekte', ListTodo], ['board', 'Board', Columns3],
+  ['matrix', 'Matrix', LayoutGrid], ['vision', 'Vision', Compass], ['analytics', 'Auswertung', Activity],
   ['insights', 'Trends', TrendingUp], ['settings', 'Einstellungen', Sparkles]
 ];
 
@@ -114,6 +114,7 @@ function App() {
       {page === 'today' && <Today entry={entry} update={update} save={save} saved={saved} setPage={setPage}
         yesterdayEntry={yesterdayEntry} onToggleTop3={toggleTop3Done} recent={recent}
         loading={loadingDashboard} onOpenEditor={openEditor}/>}
+      {page === 'overview' && <Overview/>}
       {page === 'journal' && <Journal/>}
       {page === 'goals' && <Goals/>}
       {page === 'projects' && <Projects/>}
@@ -131,7 +132,7 @@ function App() {
 }
 
 function pageTitle(page) {
-  return ({today: 'Heute', journal: 'Journal', goals: 'Ziele', projects: 'Projekte', board: 'Board', matrix: 'Eisenhower-Matrix', vision: 'Vision', analytics: 'Auswertung', insights: 'Trends', settings: 'Einstellungen'})[page];
+  return ({today: 'Heute', overview: 'Übersicht', journal: 'Journal', goals: 'Ziele', projects: 'Projekte', board: 'Board', matrix: 'Eisenhower-Matrix', vision: 'Vision', analytics: 'Auswertung', insights: 'Trends', settings: 'Einstellungen'})[page];
 }
 
 // =========================================================================
@@ -155,17 +156,7 @@ function Today({entry, update, save, setPage, saved, yesterdayEntry, onToggleTop
         </div>
       </Card>
 
-      <Card>
-        <div className="card-head"><h3>Daily Check</h3><span className="muted">kleine Dinge, große Wirkung</span></div>
-        <div className="checks">
-          <Toggle label="🏃 Laufen" value={!!entry.running} onChange={v => update('running', v)}/>
-          <Toggle label="🏋️ Krafttraining" value={!!entry.strength_training} onChange={v => update('strength_training', v)}/>
-          <Toggle label="📖 30 min gelesen" value={!!entry.reading_30min} onChange={v => update('reading_30min', v)}/>
-          <Toggle label="🍳 Selbst gekocht" value={!!entry.self_cooked} onChange={v => update('self_cooked', v)}/>
-          <Toggle label="👤 Neues kennengelernt" value={!!entry.new_person} onChange={v => update('new_person', v)}/>
-          <Toggle label="💼 Neuer Kunde" value={!!entry.new_customer} onChange={v => update('new_customer', v)}/>
-        </div>
-      </Card>
+      <DailyCheckCard entry={entry} update={update}/>
 
       <Card>
         <div className="card-head"><h3>Was ist heute passiert?</h3><span className="muted">kurz & ehrlich</span></div>
@@ -217,9 +208,90 @@ function Today({entry, update, save, setPage, saved, yesterdayEntry, onToggleTop
   </div>;
 }
 
+// ---- Daily Check inkl. eigener Check-Punkte -----------------------------
+function DailyCheckCard({entry, update}) {
+  const [custom, setCustom] = useState([]);
+  const [done, setDone] = useState([]);
+  const [name, setName] = useState('');
+  useEffect(() => {
+    api('/checks').then(setCustom).catch(() => {});
+    api('/checks/' + today).then(d => setDone(d.done)).catch(() => {});
+  }, []);
+  const toggleCustom = c => {
+    const nd = done.includes(c.id) ? done.filter(x => x !== c.id) : [...done, c.id];
+    setDone(nd);
+    api('/checks/' + today, {method: 'PUT', body: JSON.stringify({check_id: c.id, done: nd.includes(c.id)})}).catch(() => {});
+  };
+  const add = async () => {
+    if (!name.trim()) return;
+    try {
+      const x = await api('/checks', {method: 'POST', body: JSON.stringify({name})});
+      setCustom(cs => [...cs, x]);
+      setName('');
+    } catch (e) {}
+  };
+  const del = async c => {
+    setCustom(cs => cs.filter(x => x.id !== c.id));
+    await api('/checks/' + c.id, {method: 'DELETE'}).catch(() => {});
+  };
+  return <Card>
+    <div className="card-head"><h3>Daily Check</h3><span className="muted">kleine Dinge, große Wirkung</span></div>
+    <div className="checks">
+      <Toggle label="🏃 Laufen" value={!!entry.running} onChange={v => update('running', v)}/>
+      <Toggle label="🏋️ Krafttraining" value={!!entry.strength_training} onChange={v => update('strength_training', v)}/>
+      <Toggle label="📖 30 min gelesen" value={!!entry.reading_30min} onChange={v => update('reading_30min', v)}/>
+      <Toggle label="🍳 Selbst gekocht" value={!!entry.self_cooked} onChange={v => update('self_cooked', v)}/>
+      <Toggle label="👤 Neues kennengelernt" value={!!entry.new_person} onChange={v => update('new_person', v)}/>
+      <Toggle label="💼 Neuer Kunde" value={!!entry.new_customer} onChange={v => update('new_customer', v)}/>
+      {custom.map(c => <div key={c.id} className={'toggle custom' + (done.includes(c.id) ? ' on' : '')}>
+        <button type="button" className="cbtn" onClick={() => toggleCustom(c)}>
+          <span>{done.includes(c.id) ? '✓' : '○'}</span>{c.icon} {c.name}
+        </button>
+        <button type="button" className="cdel" title="Check-Punkt entfernen" onClick={() => del(c)}><X size={12}/></button>
+      </div>)}
+    </div>
+    <div className="addcheck">
+      <input placeholder="Eigener Punkt, z.B. 🧘 Meditiert" value={name}
+        onChange={e => setName(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') add(); }}/>
+      <button className="secondary" onClick={add}><CirclePlus size={15}/> Hinzufügen</button>
+    </div>
+  </Card>;
+}
+
+// ---- Uebersicht: alles fuer den Tag auf einer Seite ---------------------
+function Overview() {
+  const [draft, setDraft] = useState(null);
+  const [flash, setFlash] = useState('');
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    api('/daily/' + today).then(d => setDraft({...d, day: today})).catch(() => setDraft({day: today}));
+  }, []);
+  const upd = (k, v) => setDraft(d => ({...d, [k]: v}));
+  const save = async () => {
+    setSaving(true);
+    try {
+      const x = await api('/daily', {method: 'PUT', body: JSON.stringify(draft)});
+      setDraft({...x});
+      setFlash('Gespeichert ✓');
+      setTimeout(() => setFlash(''), 2000);
+    } catch (e) { setFlash('Fehler beim Speichern'); }
+    setSaving(false);
+  };
+  if (!draft) return <div className="single"><Card><div className="empty-inline">Lädt …</div></Card></div>;
+  return <div className="single">
+    <Card>
+      <div className="card-head"><h3>Alles für {formatDate(today)}</h3><Calendar/></div>
+      <DayFormBody draft={draft} upd={upd}/>
+      <div className="button-row overview-save">
+        <button className="primary" onClick={save} disabled={saving}><Save size={16}/>{flash || (saving ? 'Speichert …' : 'Alles speichern')}</button>
+      </div>
+    </Card>
+  </div>;
+}
+
 // ---- Day strip: quick picker for the last 7 days -----------------------
-function DayStrip({recent, onPick}) {
-  const byDay = Object.fromEntries((recent || []).map(e => [e.day, e]));
+function DayStrip({recent, onPick}) {  const byDay = Object.fromEntries((recent || []).map(e => [e.day, e]));
   const days = [...Array(7)].map((_, i) => addDays(today, -6 + i));
   return <Card className="day-strip-card">
     <div className="card-head"><h3>Letzte 7 Tage</h3><span className="muted">antippen zum Bearbeiten</span></div>
@@ -274,39 +346,109 @@ function YesterdayRecap({yesterday: y, loading}) {
   const scored = present.map(m => m.invert ? (1 - m.v / m.max) : (m.v / m.max));
   const score = scored.length ? Math.round(scored.reduce((a, b) => a + b, 0) / scored.length * 100) : null;
   const scoreColor = score == null ? '#94a3b8' : score >= 70 ? '#10b981' : score >= 45 ? '#f59e0b' : '#ef4444';
+  const checksDone = [y.running, y.strength_training, y.reading_30min, y.self_cooked, y.new_person, y.new_customer].filter(Boolean).length;
+  const moodEmoji = y.mood ? moods[y.mood - 1] : '·';
 
   return <Card className="recap-card">
     <div className="card-head"><h3>📊 Gestern im Rückblick</h3><span className="muted">{formatDate(y.day)}</span></div>
     {present.length === 0
       ? <div className="empty-inline">Für gestern wurden keine Kennzahlen erfasst.</div>
-      : <div className="recap-body">
-        <div className="recap-score">
+      : <div className="recap-body v2">
+        <div className="recap-left">
           <div className="score-ring" style={{background: `conic-gradient(${scoreColor} ${score}%, #eef0f3 0)`}}>
-            <div className="score-inner"><b>{score}</b><small>%</small></div>
+            <div className="score-inner"><span className="recap-emoji">{moodEmoji}</span><b>{score}<small>%</small></b></div>
           </div>
-          <span className="score-label">Gesamtprognose</span>
+          <span className="score-label">Gesamtbilanz</span>
+          <span className="chip-checks"><Check size={13}/> {checksDone}/6 Checks</span>
         </div>
         <div className="recap-bars">
           {present.map(m => <div className="recap-row" key={m.l}>
             <span className="row-lbl">{m.l}</span>
-            <div className="track"><div className="fill" style={{width: Math.min(100, m.v / m.max * 100) + '%', background: m.c}}/></div>
+            <div className="track"><div className="fill" style={{width: Math.min(100, m.v / m.max * 100) + '%', background: `linear-gradient(90deg, ${m.c}88, ${m.c})`}}/></div>
             <span className="val">{m.v}{m.suffix || ''}</span>
           </div>)}
         </div>
       </div>}
-    {y.highlight && <p className="recap-highlight">🌟 {y.highlight}</p>}
+    {y.highlight && <div className="recap-highlight"><span>🌟</span><p>{y.highlight}</p></div>}
   </Card>;
 }
 
+// ---- Gemeinsames Formular: alle Felder eines Tages (Modal + Uebersicht) --
+function DayFormBody({draft, upd}) {
+  const [advanced, setAdvanced] = useState(false);
+  return <>
+    <section className="modal-section">
+      <h4>Stimmung &amp; Werte</h4>
+      <div className="mood-row">{moods.map((m, i) => <button key={m} type="button" className={draft.mood === i + 1 ? 'mood selected' : 'mood'} onClick={() => upd('mood', i + 1)}>{m}</button>)}</div>
+      <div className="quick-stats modal-grid">
+        <Field label="Tagesrating (1-10)"><input type="number" min="1" max="10" value={draft.day_rating || ''} onChange={e => upd('day_rating', num(e.target.value))}/></Field>
+        <Field label="Produktivität (1-10)"><input type="number" min="1" max="10" value={draft.productivity || ''} onChange={e => upd('productivity', num(e.target.value))}/></Field>
+        <Field label="Energie (1-10)"><input type="number" min="1" max="10" value={draft.energy || ''} onChange={e => upd('energy', num(e.target.value))}/></Field>
+        <Field label="Stress (1-10)"><input type="number" min="1" max="10" value={draft.stress || ''} onChange={e => upd('stress', num(e.target.value))}/></Field>
+        <Field label="Schlaf (h)"><input type="text" inputMode="decimal" placeholder="7,5" value={draft.sleep_hours ?? ''} onChange={e => upd('sleep_hours', num(e.target.value))}/></Field>
+        <Field label="Wasser (L)"><input type="text" inputMode="decimal" placeholder="1,5" value={draft.water_liters ?? ''} onChange={e => upd('water_liters', num(e.target.value))}/></Field>
+      </div>
+    </section>
+
+    <section className="modal-section">
+      <h4>Daily Check</h4>
+      <div className="checks">
+        <Toggle label="🏃 Laufen" value={!!draft.running} onChange={v => upd('running', v)}/>
+        <Toggle label="🏋️ Krafttraining" value={!!draft.strength_training} onChange={v => upd('strength_training', v)}/>
+        <Toggle label="📖 30 min gelesen" value={!!draft.reading_30min} onChange={v => upd('reading_30min', v)}/>
+        <Toggle label="🍳 Selbst gekocht" value={!!draft.self_cooked} onChange={v => upd('self_cooked', v)}/>
+        <Toggle label="👤 Neues kennengelernt" value={!!draft.new_person} onChange={v => upd('new_person', v)}/>
+        <Toggle label="💼 Neuer Kunde" value={!!draft.new_customer} onChange={v => upd('new_customer', v)}/>
+      </div>
+    </section>
+
+    <section className="modal-section">
+      <h4>Reflexion</h4>
+      <div className="text-grid">
+        <Field label="🌟 Highlight"><textarea value={draft.highlight || ''} onChange={e => upd('highlight', e.target.value)}/></Field>
+        <Field label="🏆 Erfolg"><textarea value={draft.success || ''} onChange={e => upd('success', e.target.value)}/></Field>
+        <Field label="💼 Arbeit"><textarea value={draft.work_note || ''} onChange={e => upd('work_note', e.target.value)}/></Field>
+        <Field label="😂 Etwas Lustiges"><textarea value={draft.funny || ''} onChange={e => upd('funny', e.target.value)}/></Field>
+        <Field label="📚 Gelernt"><textarea value={draft.learned || ''} onChange={e => upd('learned', e.target.value)}/></Field>
+        <Field label="🙏 Dankbarkeit"><textarea value={draft.gratitude || ''} onChange={e => upd('gratitude', e.target.value)}/></Field>
+        <Field label="🧠 Weisheit"><textarea value={draft.wisdom || ''} onChange={e => upd('wisdom', e.target.value)}/></Field>
+        <Field label="🔮 Für meine Zukunft"><textarea value={draft.future_action || ''} onChange={e => upd('future_action', e.target.value)}/></Field>
+      </div>
+    </section>
+
+    <section className="modal-section">
+      <h4>Morgen · Top 3</h4>
+      <div className="top3">{[1, 2, 3].map(n => <Field key={n} label={'0' + n}><input value={draft['tomorrow_' + n] || ''} onChange={e => upd('tomorrow_' + n, e.target.value)} placeholder="Wichtigste Aufgabe …"/></Field>)}</div>
+    </section>
+
+    <button type="button" className="advanced-toggle" onClick={() => setAdvanced(a => !a)}>
+      <ChevronDown size={16} className={advanced ? 'rot' : ''}/> Weitere Felder (Ernährung, Finanzen, Notizen)
+    </button>
+    {advanced && <section className="modal-section">
+      <div className="quick-stats modal-grid">
+        <Field label="Protein (g)"><input type="text" inputMode="decimal" value={draft.protein_grams ?? ''} onChange={e => upd('protein_grams', num(e.target.value))}/></Field>
+        <Field label="Gespart (€)"><input type="text" inputMode="decimal" value={draft.money_saved ?? ''} onChange={e => upd('money_saved', num(e.target.value))}/></Field>
+        <Field label="Verdient (€)"><input type="text" inputMode="decimal" value={draft.money_earned ?? ''} onChange={e => upd('money_earned', num(e.target.value))}/></Field>
+        <Field label="Ausgaben (€)"><input type="text" inputMode="decimal" value={draft.expenses ?? ''} onChange={e => upd('expenses', num(e.target.value))}/></Field>
+      </div>
+      <div className="text-grid">
+        <Field label="🍽️ Essensnotiz"><textarea value={draft.food_note || ''} onChange={e => upd('food_note', e.target.value)}/></Field>
+        <Field label="🎧 Album des Tages"><input value={draft.album || ''} onChange={e => upd('album', e.target.value)}/></Field>
+        <Field label="🛠️ Tool des Tages"><input value={draft.tool_of_day || ''} onChange={e => upd('tool_of_day', e.target.value)}/></Field>
+        <Field label="📈 Trading-Notiz"><textarea value={draft.trade_note || ''} onChange={e => upd('trade_note', e.target.value)}/></Field>
+        <Field label="👁️ Watchlist"><textarea value={draft.watchlist || ''} onChange={e => upd('watchlist', e.target.value)}/></Field>
+      </div>
+    </section>}
+  </>;
+}
+
 // =========================================================================
-// Day editor modal — create a new day or edit any existing day, with
-// every field the data model supports.
+// Day editor modal — create a new day or edit any existing day
 // =========================================================================
 function DayEditorModal({initialDay, onClose, onSaved}) {
   const [day, setDay] = useState(initialDay);
   const [draft, setDraft] = useState(null); // null while loading
   const [saving, setSaving] = useState(false);
-  const [advanced, setAdvanced] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -344,70 +486,8 @@ function DayEditorModal({initialDay, onClose, onSaved}) {
 
       {!draft ? <div className="modal-body"><div className="empty-inline">Lädt …</div></div> : <>
         <div className="modal-body">
-          <section className="modal-section">
-            <h4>Stimmung &amp; Werte</h4>
-            <div className="mood-row">{moods.map((m, i) => <button key={m} type="button" className={draft.mood === i + 1 ? 'mood selected' : 'mood'} onClick={() => upd('mood', i + 1)}>{m}</button>)}</div>
-            <div className="quick-stats modal-grid">
-              <Field label="Tagesrating (1-10)"><input type="number" min="1" max="10" value={draft.day_rating || ''} onChange={e => upd('day_rating', num(e.target.value))}/></Field>
-              <Field label="Produktivität (1-10)"><input type="number" min="1" max="10" value={draft.productivity || ''} onChange={e => upd('productivity', num(e.target.value))}/></Field>
-              <Field label="Energie (1-10)"><input type="number" min="1" max="10" value={draft.energy || ''} onChange={e => upd('energy', num(e.target.value))}/></Field>
-              <Field label="Stress (1-10)"><input type="number" min="1" max="10" value={draft.stress || ''} onChange={e => upd('stress', num(e.target.value))}/></Field>
-              <Field label="Schlaf (h)"><input type="text" inputMode="decimal" placeholder="7,5" value={draft.sleep_hours ?? ''} onChange={e => upd('sleep_hours', num(e.target.value))}/></Field>
-              <Field label="Wasser (L)"><input type="text" inputMode="decimal" placeholder="1,5" value={draft.water_liters ?? ''} onChange={e => upd('water_liters', num(e.target.value))}/></Field>
-            </div>
-          </section>
-
-          <section className="modal-section">
-            <h4>Daily Check</h4>
-            <div className="checks">
-              <Toggle label="🏃 Laufen" value={!!draft.running} onChange={v => upd('running', v)}/>
-              <Toggle label="🏋️ Krafttraining" value={!!draft.strength_training} onChange={v => upd('strength_training', v)}/>
-              <Toggle label="📖 30 min gelesen" value={!!draft.reading_30min} onChange={v => upd('reading_30min', v)}/>
-              <Toggle label="🍳 Selbst gekocht" value={!!draft.self_cooked} onChange={v => upd('self_cooked', v)}/>
-              <Toggle label="👤 Neues kennengelernt" value={!!draft.new_person} onChange={v => upd('new_person', v)}/>
-              <Toggle label="💼 Neuer Kunde" value={!!draft.new_customer} onChange={v => upd('new_customer', v)}/>
-            </div>
-          </section>
-
-          <section className="modal-section">
-            <h4>Reflexion</h4>
-            <div className="text-grid">
-              <Field label="🌟 Highlight"><textarea value={draft.highlight || ''} onChange={e => upd('highlight', e.target.value)}/></Field>
-              <Field label="🏆 Erfolg"><textarea value={draft.success || ''} onChange={e => upd('success', e.target.value)}/></Field>
-              <Field label="💼 Arbeit"><textarea value={draft.work_note || ''} onChange={e => upd('work_note', e.target.value)}/></Field>
-              <Field label="😂 Etwas Lustiges"><textarea value={draft.funny || ''} onChange={e => upd('funny', e.target.value)}/></Field>
-              <Field label="📚 Gelernt"><textarea value={draft.learned || ''} onChange={e => upd('learned', e.target.value)}/></Field>
-              <Field label="🙏 Dankbarkeit"><textarea value={draft.gratitude || ''} onChange={e => upd('gratitude', e.target.value)}/></Field>
-              <Field label="🧠 Weisheit"><textarea value={draft.wisdom || ''} onChange={e => upd('wisdom', e.target.value)}/></Field>
-              <Field label="🔮 Für meine Zukunft"><textarea value={draft.future_action || ''} onChange={e => upd('future_action', e.target.value)}/></Field>
-            </div>
-          </section>
-
-          <section className="modal-section">
-            <h4>Morgen · Top 3</h4>
-            <div className="top3">{[1, 2, 3].map(n => <Field key={n} label={'0' + n}><input value={draft['tomorrow_' + n] || ''} onChange={e => upd('tomorrow_' + n, e.target.value)} placeholder="Wichtigste Aufgabe …"/></Field>)}</div>
-          </section>
-
-          <button type="button" className="advanced-toggle" onClick={() => setAdvanced(a => !a)}>
-            <ChevronDown size={16} className={advanced ? 'rot' : ''}/> Weitere Felder (Ernährung, Finanzen, Notizen)
-          </button>
-          {advanced && <section className="modal-section">
-            <div className="quick-stats modal-grid">
-              <Field label="Protein (g)"><input type="text" inputMode="decimal" value={draft.protein_grams ?? ''} onChange={e => upd('protein_grams', num(e.target.value))}/></Field>
-              <Field label="Gespart (€)"><input type="text" inputMode="decimal" value={draft.money_saved ?? ''} onChange={e => upd('money_saved', num(e.target.value))}/></Field>
-              <Field label="Verdient (€)"><input type="text" inputMode="decimal" value={draft.money_earned ?? ''} onChange={e => upd('money_earned', num(e.target.value))}/></Field>
-              <Field label="Ausgaben (€)"><input type="text" inputMode="decimal" value={draft.expenses ?? ''} onChange={e => upd('expenses', num(e.target.value))}/></Field>
-            </div>
-            <div className="text-grid">
-              <Field label="🍽️ Essensnotiz"><textarea value={draft.food_note || ''} onChange={e => upd('food_note', e.target.value)}/></Field>
-              <Field label="🎧 Album des Tages"><input value={draft.album || ''} onChange={e => upd('album', e.target.value)}/></Field>
-              <Field label="🛠️ Tool des Tages"><input value={draft.tool_of_day || ''} onChange={e => upd('tool_of_day', e.target.value)}/></Field>
-              <Field label="📈 Trading-Notiz"><textarea value={draft.trade_note || ''} onChange={e => upd('trade_note', e.target.value)}/></Field>
-              <Field label="👁️ Watchlist"><textarea value={draft.watchlist || ''} onChange={e => upd('watchlist', e.target.value)}/></Field>
-            </div>
-          </section>}
+          <DayFormBody draft={draft} upd={upd}/>
         </div>
-
         <div className="modal-footer">
           {error && <span className="modal-error">{error}</span>}
           <button className="secondary" onClick={onClose}>Abbrechen</button>

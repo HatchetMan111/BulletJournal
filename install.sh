@@ -91,6 +91,10 @@ if ! [[ "$CTID" =~ ^[0-9]+$ ]] || [[ "$CTID" -lt 100 ]]; then
   die "Ungueltige Container-ID: '$CTID' (muss eine Zahl >= 100 sein)"
 fi
 
+echo -ne "${YW}Optionales App-Passwort (Eingabe versteckt, leer = kein Login): ${CL}"
+read -rs APP_PW
+echo ""
+
 if pct status "$CTID" &>/dev/null; then
   if [[ "$CTID" == "$DEFAULT_CTID" ]]; then
     msg_info "Container ${CTID} ist belegt - suche naechste freie ID"
@@ -201,7 +205,7 @@ msg_ok "Frontend gebaut"
 
 # ── systemd-Dienst einrichten ───────────────────────────────────────
 msg_info "Erstelle systemd-Dienst (bulletjournal.service)"
-pct exec "$CTID" -- bash <<'BJ_SETUP'
+pct exec "$CTID" -- env BJ_PW="$APP_PW" bash <<'BJ_SETUP'
 set -e
 cat <<'SVCEOF' > /etc/systemd/system/bulletjournal.service
 [Unit]
@@ -221,6 +225,10 @@ Environment=BULLETJOURNAL_DATA_DIR=/opt/bulletjournal/data
 [Install]
 WantedBy=multi-user.target
 SVCEOF
+
+if [[ -n "$BJ_PW" ]]; then
+  echo "Environment=BULLETJOURNAL_PASSWORD=$BJ_PW" >> /etc/systemd/system/bulletjournal.service
+fi
 
 systemctl daemon-reload
 systemctl enable --now bulletjournal >/dev/null 2>&1
@@ -267,6 +275,11 @@ echo -e "  ${CM} Service:      ${YW}systemctl status bulletjournal${CL}"
 echo -e "  ${CM} Logs:         ${YW}journalctl -u bulletjournal -f${CL}"
 echo -e "  ${CM} Daten:        ${YW}/opt/bulletjournal/data/${CL}"
 echo -e "  ${CM} Export:       ${YW}http://${CT_IP}:8000/api/export${CL}"
+if [[ -n "$APP_PW" ]]; then
+  echo -e "  ${CM} Login:        ${YW}Passwortschutz aktiv${CL}"
+else
+  echo -e "  ${CM} Login:        ${YW}kein Passwort gesetzt${CL}"
+fi
 echo ""
 echo -e "  ${YW}Container-Shell:${CL}"
 echo -e "  ${YW}  pct enter ${CTID}${CL}"

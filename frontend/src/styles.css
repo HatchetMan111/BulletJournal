@@ -117,3 +117,35 @@ button.mini{border:1px solid #dfe3e8;background:#fbfbfa;border-radius:8px;paddin
   .trend-controls{flex-direction:column;align-items:stretch}
   .board-add,.matrix-add{grid-template-columns:1fr}
 }
+
+/* === Eigene Daily-Check-Punkte === */
+.toggle.custom{padding-right:8px}
+.toggle .cbtn{flex:1;display:flex;gap:8px;align-items:center;background:transparent;border:0;cursor:pointer;font:inherit;color:inherit;text-align:left;padding:0}
+.toggle .cdel{background:transparent;border:0;color:#9aa3b2;cursor:pointer;padding:2px;border-radius:6px}
+.toggle .cdel:hover{color:#ef4444;background:#fdf1f1}
+.addcheck{display:flex;gap:8px;margin-top:12px}
+.addcheck input{flex:1;border:1px dashed #cfd4db;border-radius:10px;background:#fbfbfa;padding:10px 11px;font:inherit;color:#172033}
+.addcheck input:focus{border-style:solid;border-color:#17203333;outline:none}
+
+/* === Uebersichts-Seite === */
+.overview-save{justify-content:flex-end;margin-top:14px}
+.overview-save .primary{min-width:180px}
+
+/* === Gestern im Rueckblick v2 === */
+.recap-body.v2{display:grid;grid-template-columns:132px 1fr;gap:20px;align-items:center}
+.recap-left{display:grid;justify-items:center;gap:8px}
+.score-ring{width:104px;height:104px;border-radius:50%;display:grid;place-items:center}
+.score-inner{width:78px;height:78px;border-radius:50%;background:#fff;display:grid;place-items:center;text-align:center;line-height:1.05}
+.score-inner b{font-size:21px}
+.score-inner small{font-size:10px;color:#7a8493;margin-left:1px}
+.recap-emoji{display:block;font-size:17px}
+.score-label{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#7a8493}
+.chip-checks{display:inline-flex;align-items:center;gap:5px;background:#eef5ec;border:1px solid #cdddc9;color:#203b20;border-radius:999px;padding:4px 10px;font-size:11px;font-weight:800}
+.recap-body.v2 .recap-row{display:grid;grid-template-columns:88px 1fr 42px;gap:10px;align-items:center;margin:9px 0}
+.recap-body.v2 .row-lbl{font-size:12.5px;font-weight:700;color:#5b6472}
+.recap-body.v2 .track{height:12px;border-radius:99px}
+.recap-body.v2 .fill{border-radius:99px}
+.recap-body.v2 .val{font-size:12.5px;font-weight:800;color:#172033;text-align:right}
+.recap-highlight{display:flex;gap:10px;align-items:flex-start;border-left:3px solid #f59e0b;background:#fdf9ee;padding:11px 14px;border-radius:0 12px 12px 0;margin-top:16px}
+.recap-highlight p{margin:0;font-size:13.5px;color:#5b4a1f}
+@media(max-width:640px){.recap-body.v2{grid-template-columns:1fr;justify-items:center}.recap-body.v2 .recap-bars{width:100%}}

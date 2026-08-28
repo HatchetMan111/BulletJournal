@@ -20,6 +20,7 @@ Das installiert automatisch:
 
 **Nach der Installation:**
 - URL: `http://<DEINE-IP>:8000`
+- Optionaler Passwortschutz (wird im Installer abgefragt, Anmelde-Seite im Browser)
 - Service: `systemctl status bulletjournal`
 - Logs: `journalctl -u bulletjournal -f`
 - Daten-Export: `http://<DEINE-IP>:8000/api/export`
@@ -37,8 +38,9 @@ ollama pull llama3.2:3b
 ### Tägliches Journaling
 - **Mood-Tracking** (1–6 Emoji-Skala)
 - **Tagesrating, Produktivität, Energie, Stress** (je 1–10)
-- **Schlaf & Wasseraufnahme** protookollieren
-- **Daily Check**: Laufen, Krafttraining, Lesen, Selbst kochen, Neue Menschen, Neuer Kunde
+- **Schlaf & Wasseraufnahme** protokollieren (Dezimal-Komma erlaubt: `7,5`)
+- **Daily Check**: Laufen, Krafttraining, Lesen, Selbst kochen, Neue Menschen, Neuer Kunde – **plus eigene Check-Punkte**, die du frei anlegen kannst
+- **Übersichts-Seite**: alle Felder des Tages auf einer Seite eintragen
 
 ### Reflexion & Dankbarkeit
 - Highlight, Erfolg, Arbeit, Lustiges, Gelernt, Dankbarkeit, Weisheit
@@ -141,6 +143,8 @@ In den Einstellungen der App Ollama aktivieren und URL/Modell konfigurieren.
 | `PUT` | `/api/projects/{id}` | Projekt: Fortschritt, Status (Kanban) |
 | `GET/POST/PUT/DELETE` | `/api/matrix` | Eisenhower-Matrix (Q1–Q4) |
 | `GET/PUT` | `/api/visions` | Visionen (10y/5y/1y) |
+| `PUT` | `/api/checks/{day}` | Eigene Check-Punkte pro Tag abhaken |
+| `GET/POST/DELETE` | `/api/checks` | Eigene Check-Punkte verwalten |
 | `GET/POST` | `/api/trackers` | Tracker verwalten |
 | `GET/POST` | `/api/journal` | Journal-Einträge |
 | `GET` | `/api/export` | Daten als JSON exportieren |
